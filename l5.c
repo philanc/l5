@@ -170,6 +170,8 @@ static int ll_closedir(lua_State *L) {
 	if (r == -1) RET_ERRNO; else RET_TRUE;
 }
 
+// ??? chg to lstat3() => mode, size, mtime  ???
+
 static int ll_lstat5(lua_State *L) {
 	// lua api: lstat5(path [,statflag:int])
 	// if statflag=1: do stat(). default: do lstat
@@ -233,6 +235,14 @@ static int ll_ioctl(lua_State *L) {
 }
 
 
+
+
+static int ll_poll(lua_State *L) {
+	// lua api: poll(pollsetmb, fdn, timeoutms) => n | nil, errno
+
+}
+
+
 /*
 
 static int ll_pollset_new(lua_State *L) {
@@ -290,6 +300,7 @@ static const struct luaL_Reg l5lib[] = {
 	//
 	{"open", ll_open},
 	{"ioctl", ll_ioctl},
+	{"poll", ll_poll},
 	//
 	{"mbnew", ll_mbnew},
 

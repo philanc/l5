@@ -17,6 +17,7 @@ OBJS= l5.o
 l5.so:  l5.c
 	$(CC) -c $(CFLAGS) l5.c
 	$(CC) -shared $(LDFLAGS) -o l5.so $(OBJS)
+	strip l5.so
 
 clean:
 	rm -f *.o *.a *.so
