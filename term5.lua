@@ -1,6 +1,7 @@
 
 he = require "he"
 
+
 --[[
 ln = require "linenoise"
 
@@ -54,24 +55,41 @@ function setmode(mode)
 	return l5.ioctl(0, 0x5404, mode)
 end
 
+function test_mode()
+	-- get mode
+	mode, err = getmode()
+	print("mmmm???", err)
+	print(he.stohex(mode, 16, ':'))
 
--- get mode
-mode, err = getmode()
-print("mmmm???", err)
-print(he.stohex(mode, 16, ':'))
+	print("test raw mode:  hit key, 'q' to quit.")
+	-- set raw mode
+	setmode(makerawmode(mode))
 
-print("test raw mode:  hit key, 'q' to quit.")
--- set raw mode
-setmode(makerawmode(mode))
+	while true do 
+		c = io.read(1)
+		if c == 'q' then break end
+		print(string.byte(c))
+	end
 
-while true do 
-	c = io.read(1)
-	if c == 'q' then break end
-	print(string.byte(c))
+	setmode(mode)
+	print('\rback to normal cooked mode.')
 end
 
-setmode(mode)
-print('\rback to normal cooked mode.')
+function test_mb()
+	mb = l5.mbnew(1024)
+	assert(mb:mbseti(12, 123))
+	assert(mb:mbgeti(12) == 123)
+--~ 	print(mb:mbgeti(100))-- may or may not be 0
+	assert(mb:mbzero())
+	assert(mb:mbgeti(12) == 0)
+	
+end
+
+--~ test_mode()
+test_mb()
+
+
+
 
 
 	

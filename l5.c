@@ -59,6 +59,65 @@ typedef unsigned long u32;
 typedef unsigned long long u64;
 
 //------------------------------------------------------------
+// memory block object
+// userdata, allocated memory - bytesize is stored in the first 8 bytes
+// api: memory block either as a byte array or a int64 array:
+// new(bytesize) => mb  --(bytesize must be multiple of 8)
+// get(mb, byteindex, len) => string
+// set(mb, byteindex, string)
+// geti(mb, int64index) => integer
+// seti(mb, int64index, integer)
+//
+// mb is declared in C as (char *)
+#define MBPTR(mb) (mb+8)
+#define MBSIZE(mb) (*((int64_t *) mb))
+
+#define MBNAME "mb_memory_block"
+
+static int ll_mbnew(lua_State *L) {
+	size_t size = luaL_checkinteger(L, 1);
+	if ((size % 8) != 0) LERR("mbnew: size must be multiple of 8");
+	char *mb = (char *) lua_newuserdata(L, size + 8);
+	MBSIZE(mb) = size;
+	luaL_getmetatable(L, MBNAME);
+	lua_setmetatable(L, -2);
+	return 1;
+}
+
+static int ll_mbget(lua_State *L) {
+}
+
+static int ll_mbset(lua_State *L) {
+}
+
+static int ll_mbzero(lua_State *L) {
+	char *mb = lua_touserdata(L, 1);
+	int64_t size = MBSIZE(mb);
+	memset(mb+8, 0, size);
+	RET_TRUE;
+}
+	
+static int ll_mbseti(lua_State *L) {
+	char *mb = lua_touserdata(L, 1);
+	int64_t idx = luaL_checkinteger(L, 2);
+	int64_t val = luaL_checkinteger(L, 3);
+	int64_t max = MBSIZE(mb) / 8;
+	if ((idx < 1) || (idx > max)) LERR("out of range");
+	*( ((int64_t *)mb) + idx) = val;
+	RET_TRUE;
+}
+
+static int ll_mbgeti(lua_State *L) {
+	char *mb = lua_touserdata(L, 1);
+	int64_t idx = luaL_checkinteger(L, 2);
+	int64_t max = MBSIZE(mb) / 8;
+	if ((idx < 1) || (idx > max)) LERR("out of range");
+	int64_t val = *( ((int64_t *)mb) + idx);
+	RET_INT(val);
+	
+}
+
+//------------------------------------------------------------
 // l5 functions
 
 static int ll_getpid(lua_State *L) { RET_INT(getpid()); }
@@ -173,43 +232,6 @@ static int ll_ioctl(lua_State *L) {
 	RET_TRUE;
 }
 
-// memory block object
-// userdata, allocated memory - bytesize is stored in the first 8 bytes
-// api: memory block either as a byte array or a int64 array:
-// new(bytesize) => mb  --(bytesize must be multiple of 8)
-// get(mb, byteindex, len) => string
-// set(mb, byteindex, string)
-// geti(mb, int64index) => integer
-// seti(mb, int64index, integer)
-//
-// mb is declared in C as (char *)
-#define MBPTR(mb) (mb+8)
-#define MBSIZE(mb) (*((int64_t *) mb))
-
-#define MBNAME "mb_memory_blocks"
-
-static int ll_mbnew(lua_State *L) {
-	size_t size = luaL_checkinteger(L, 1);
-	if ((size % 8) != 0) LERR("mbnew: size must be multiple of 8");
-	char *mb = (char *) lua_newuserdata(L, size + 8);
-	MBSIZE(mb) = size;
-	luaL_getmetatable(L, MBNAME);
-	lua_setmetatable(L, -2);
-	return 1;
-}
-
-static int ll_mbget(lua_State *L) {
-}
-
-static int ll_mbset(lua_State *L) {
-}
-
-static int ll_mbgeti(lua_State *L) {
-}
-
-static int ll_mbseti(lua_State *L) {
-}
-
 
 /*
 
@@ -281,6 +303,7 @@ static const struct luaL_Reg l5mbfuncs[] = {
 	{"mbset", ll_mbset},
 	{"mbgeti", ll_mbgeti},
 	{"mbseti", ll_mbseti},
+	{"mbzero", ll_mbzero},
 	{NULL, NULL},
 };
 
