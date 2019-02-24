@@ -1,6 +1,10 @@
 // Copyright (c) 2019  Phil Leblanc  -- see LICENSE file
 // ---------------------------------------------------------------------
-/*   l5  - Low-Level Linux Lua Lib
+/*   
+
+l5  - Low-Level Linux Lua Lib
+
+This is for Lua 5.3+ only, built with default 64-bit integers
 
 */
 
@@ -17,34 +21,12 @@
 #include <dirent.h>	// opendir...
 #include <fcntl.h>	// open
 #include <sys/ioctl.h>	// ioctl
+#include <poll.h>	// poll
 
 #include "lua.h"
 #include "lauxlib.h"
 
 
-//=========================================================
-// compatibility with Lua 5.2  --and lua 5.3, added 150621
-// (from roberto's lpeg 0.10.1 dated 101203)
-//
-#if (LUA_VERSION_NUM >= 502)
-
-#undef lua_equal
-#define lua_equal(L,idx1,idx2)  lua_compare(L,(idx1),(idx2),LUA_OPEQ)
-
-#undef lua_getfenv
-#define lua_getfenv	lua_getuservalue
-#undef lua_setfenv
-#define lua_setfenv	lua_setuservalue
-
-#undef lua_objlen
-#define lua_objlen	lua_rawlen
-
-#undef luaL_register
-#define luaL_register(L,n,f) \
-	{ if ((n) == NULL) luaL_setfuncs(L,f,0); else luaL_newlib(L,f); }
-
-#endif
-//=========================================================
 
 #define LERR(msg) return luaL_error(L, msg)
 
@@ -54,11 +36,15 @@
 #define RET_STRN(s, slen) return (lua_pushlstring (L, (s), (slen)), 1)
 #define RET_STRZ(s) return (lua_pushstring (L, (s)), 1)
 
-typedef unsigned char u8;
-typedef unsigned long u32;
-typedef unsigned long long u64;
+//~ typedef unsigned char u8;
+//~ typedef unsigned long u32;
+//~ typedef unsigned long long u64;
 
-//------------------------------------------------------------
+
+// default timeout: 10 seconds  (poll, ...)
+#define DEFAULT_TIMEOUT 10000
+
+//----------------------------------------------------------------------
 // memory block object
 // userdata, allocated memory - bytesize is stored in the first 8 bytes
 // api: memory block either as a byte array or a int64 array:
@@ -68,8 +54,12 @@ typedef unsigned long long u64;
 // geti(mb, int64index) => integer
 // seti(mb, int64index, integer)
 //
-// mb is declared in C as (char *)
-#define MBPTR(mb) (mb+8)
+// Usage in C
+// 	void *mb = lua_touserdata(L, idx); // get mb from the Lua stack
+//	size_t size = MBSIZE(mb) // size of the available memory block
+//	void *ptr = MBPTR(mb) // pointer to the start of the memory block
+
+#define MBPTR(mb) ((void *)(((char *)mb)+8))
 #define MBSIZE(mb) (*((int64_t *) mb))
 
 #define MBNAME "mb_memory_block"
@@ -85,12 +75,40 @@ static int ll_mbnew(lua_State *L) {
 }
 
 static int ll_mbget(lua_State *L) {
+	// the memory block is seen as a byte array
+	// lua api:  mb:get(idx, len)
+	// return the len bytes at index idx as a string
+	// byte index startx at 1
+	// if len is too large given mb size and idx, the function errors.
+	// if len is not provided it deafults to the mb size
+	// if idx is not provided, it defaults to 1
+	// so mg:get() returns all the content of the mb as a string
+	char *mb = lua_touserdata(L, 1);
+	int64_t size = MBSIZE(mb);
+	int64_t idx = luaL_optinteger(L, 2, 1);
+	int64_t len = luaL_optinteger(L, 3, size);
+	if ((idx+len) > size + 1) LERR("out of range");
+	RET_STRN(mb+8, len);
 }
 
 static int ll_mbset(lua_State *L) {
+	// the memory block is seen as a byte array
+	// lua api:  mb:set(idx, str)
+	// copy string str in mb at byte index idx (starting at 1) 
+	// if  string is too long to fit, the function errors.
+	char *mb = lua_touserdata(L, 1);
+	int64_t size = MBSIZE(mb);
+	int64_t idx = luaL_checkinteger(L, 2);
+	int64_t len;
+	const char *str = luaL_checklstring(L, 3, &len);
+	if ((idx+len) > size + 1) LERR("out of range");	
+	memcpy(mb + 8 + (idx - 1), str, len);
+	RET_TRUE;
 }
 
 static int ll_mbzero(lua_State *L) {
+	// lua api:  mb:zero()
+	// fill the memory block with zeros
 	char *mb = lua_touserdata(L, 1);
 	int64_t size = MBSIZE(mb);
 	memset(mb+8, 0, size);
@@ -98,23 +116,27 @@ static int ll_mbzero(lua_State *L) {
 }
 	
 static int ll_mbseti(lua_State *L) {
-	char *mb = lua_touserdata(L, 1);
+	// lua api: mb:seti(idx, i)
+	// mb is seen as an array of int64, starting at index 1
+	// mb:seti(idx, i) sets element at index idx to the value i
+	int64_t *mb = lua_touserdata(L, 1);
 	int64_t idx = luaL_checkinteger(L, 2);
-	int64_t val = luaL_checkinteger(L, 3);
+	int64_t i = luaL_checkinteger(L, 3);
 	int64_t max = MBSIZE(mb) / 8;
 	if ((idx < 1) || (idx > max)) LERR("out of range");
-	*( ((int64_t *)mb) + idx) = val;
+	*(mb + idx) = i;
 	RET_TRUE;
 }
 
 static int ll_mbgeti(lua_State *L) {
-	char *mb = lua_touserdata(L, 1);
+	// lua api: mb:geti(idx)
+	// mb is seen as an array of int64, starting at index 1
+	// mb:geti(idx) returns the element at index idx
+	int64_t *mb = lua_touserdata(L, 1);
 	int64_t idx = luaL_checkinteger(L, 2);
 	int64_t max = MBSIZE(mb) / 8;
 	if ((idx < 1) || (idx > max)) LERR("out of range");
-	int64_t val = *( ((int64_t *)mb) + idx);
-	RET_INT(val);
-	
+	RET_INT(*(mb + idx));
 }
 
 //------------------------------------------------------------
@@ -237,13 +259,40 @@ static int ll_ioctl(lua_State *L) {
 
 
 
-static int ll_poll(lua_State *L) {
-	// lua api: poll(pollsetmb, fdn, timeoutms) => n | nil, errno
 
+static int ll_poll(lua_State *L) {
+	// lua api: poll(pollsetmb, nfds, timeout) => n | nil, errno
+	// pollsetmb: an array of struct pollfd stored in a memory block (mb)
+	// ndfs: number of  pollfd in the pollset
+	// timeout:  timeout in millisecs
+	//
+	//~ struct pollfd *pfd = (void *)(lua_touserdata(L, 1);
+	//~ struct pollfd *pfd = MBPTR(;
+	
+
+}
+
+static int ll_pollin(lua_State *L) {
+	// a simplified poll variant to monitor only one input fd
+	// with an easy interface
+	// lua api: pollin(fd, timeout)
+	// fd: fd to monitor (input only)
+	// timeout:  timeout in millisecs
+	// return 1 | 0 on timeout | nil, errno on error
+	int fd = luaL_checkinteger(L, 1);
+	int timeout = luaL_optinteger(L, 2, DEFAULT_TIMEOUT); 
+	struct pollfd pfd;
+	pfd.fd = fd;
+	pfd.events = POLLIN;
+	pfd.revents = 0;
+	int n = poll(&pfd, (nfds_t) 1, timeout);
+	if (n < 0) RET_ERRNO;
+	RET_INT(n);
 }
 
 
 /*
+
 
 static int ll_pollset_new(lua_State *L) {
 	// lua api: pollset_new(fdn) => u | nil, errno
@@ -283,8 +332,12 @@ static int ll_pollset_get(lua_State *L) {
 //------------------------------------------------------------
 // lua library declaration
 //
+
+// l5 function table
 static const struct luaL_Reg l5lib[] = {
-	// l5 function table
+	//
+	{"mbnew", ll_mbnew},
+	//
 	{"getpid", ll_getpid},
 	{"getppid", ll_getppid},
 	{"chdir", ll_chdir},
@@ -301,20 +354,21 @@ static const struct luaL_Reg l5lib[] = {
 	{"open", ll_open},
 	{"ioctl", ll_ioctl},
 	{"poll", ll_poll},
+	{"pollin", ll_pollin},
 	//
-	{"mbnew", ll_mbnew},
+
 
 		
 	{NULL, NULL},
 };
 
+// l5 memory block (mb) methods
 static const struct luaL_Reg l5mbfuncs[] = {
-	// l5 memory block (mb) methods
-	{"mbget", ll_mbget},
-	{"mbset", ll_mbset},
-	{"mbgeti", ll_mbgeti},
-	{"mbseti", ll_mbseti},
-	{"mbzero", ll_mbzero},
+	{"get", ll_mbget},
+	{"set", ll_mbset},
+	{"geti", ll_mbgeti},
+	{"seti", ll_mbseti},
+	{"zero", ll_mbzero},
 	{NULL, NULL},
 };
 
@@ -329,7 +383,8 @@ int luaopen_l5 (lua_State *L) {
 	lua_pop(L, 1);  // pop the metatable left on the stack
 
 	// register main library functions
-	luaL_register (L, "l5", l5lib);
+	//~ luaL_register (L, "l5", l5lib);
+	luaL_newlib (L, l5lib);
 	lua_pushliteral (L, "VERSION");
 	lua_pushliteral (L, L5_VERSION); 
 	lua_settable (L, -3);

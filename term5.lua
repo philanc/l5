@@ -77,15 +77,15 @@ end
 
 function test_mb()
 	mb = l5.mbnew(1024)
-	assert(mb:mbseti(12, 123))
-	assert(mb:mbgeti(12) == 123)
+	assert(mb:seti(12, 123))
+	assert(mb:geti(12) == 123)
 --~ 	print(mb:mbgeti(100))-- may or may not be 0
-	assert(mb:mbzero())
-	assert(mb:mbgeti(12) == 0)
-	
+	assert(mb:zero())
+	assert(mb:geti(12) == 0)
+	print("mb functions: ok.")
 end
 
---~ test_mode()
+test_mode()
 test_mb()
 
 
