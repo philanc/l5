@@ -6,6 +6,49 @@ he = require "he" -- at https://github.com/philanc/he
 
 l5 = require "l5"
 
+------------------------------------------------------------------------
+
+function test_mb()
+	-- test memory block (mb) methods
+	mb = l5.mbnew(1024)
+	assert(mb:seti(12, 123))
+	assert(mb:geti(12) == 123)
+--~ 	print(mb:mbgeti(100))-- may or may not be 0
+	assert(mb:zero())
+	assert(mb:geti(12) == 0)
+	mb:zero()
+	assert(mb:set(17, "abc"))
+	assert(mb:get(17, 5) == "abc\0\0")
+	assert(mb:geti(3) & 0xff == 97) -- !! little endian only :-)
+	print("test_mb: ok.")
+end
+
+------------------------------------------------------------------------
+-- test process info
+
+function test_procinfo()
+--~ 	print(l5.getpid())
+--~ 	print(l5.getppid())
+--~ 	print(l5.geteuid())
+--~ 	print(l5.getegid())
+--~ 	print(l5.getcwd())
+	assert(math.type(l5.getpid()) == "integer")
+	assert(math.type(l5.getppid()) == "integer")
+	assert(math.type(l5.geteuid()) == "integer")
+	assert(math.type(l5.getegid()) == "integer")
+	assert(l5.getcwd():match(".*l5$"))
+	local k, v = 'xyzzyzzy', 'XYZZYZZY'
+	assert(os.getenv(k) == nil)
+	l5.setenv(k, v); assert(os.getenv(k) == v)
+	l5.unsetenv(k); assert(os.getenv(k) == nil)
+	print("test_procinfo: ok.")
+end
+
+------------------------------------------------------------------------
+-- test stat
+
+------------------------------------------------------------------------
+-- test ioctl() - set tty in raw mode and back to original mode
 
 function makerawmode(mode, opostflag)
 	-- mode is the content of struct termios for the current tty
@@ -63,28 +106,18 @@ function test_mode()
 	print('\rback to normal cooked mode.')
 end
 
-function test_mb()
-	-- test memory block (mb) methods
-	mb = l5.mbnew(1024)
-	assert(mb:seti(12, 123))
-	assert(mb:geti(12) == 123)
---~ 	print(mb:mbgeti(100))-- may or may not be 0
-	assert(mb:zero())
-	assert(mb:geti(12) == 0)
-	mb:zero()
-	assert(mb:set(17, "abc"))
-	assert(mb:get(17, 5) == "abc\0\0")
-	assert(mb:geti(3) & 0xff == 97) -- !! little endian only :-)
-	print("mb functions: ok.")
-end
+------------------------------------------------------------------------
 
---~ test_mode()
 test_mb()
+test_procinfo()
+--~ test_mode()
 
 
+
+------------------------------------------------------------------------
 --[[
 
---- TEMP NOTES
+--- TEMP NOTES  (ioctl, tty modes)
 
 --from bits/termios.h
 
@@ -146,15 +179,6 @@ int tcsetattr(int fd, int act, const struct termios *tio)
 tcsetattr
 TCSAFLUSH=2, TCSETS=0x5402
 tcsetattr(0,TCSAFLUSH,&tio) => ioctl(0, 0x5404, &tio);
-
----
-
-
-
-
-
-
-
 
 ]]
 

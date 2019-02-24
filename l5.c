@@ -16,7 +16,7 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 
 #include <sys/types.h>	// getpid
 #include <sys/stat.h>	// stat
-#include <unistd.h>	// getpid, getcwd
+#include <unistd.h>	// getpid getcwd getresuid,
 #include <errno.h>	// errno
 #include <dirent.h>	// opendir...
 #include <fcntl.h>	// open
@@ -145,6 +145,10 @@ static int ll_mbgeti(lua_State *L) {
 static int ll_getpid(lua_State *L) { RET_INT(getpid()); }
 
 static int ll_getppid(lua_State *L) { RET_INT(getppid()); }
+
+static int ll_geteuid(lua_State *L) { RET_INT(geteuid()); }
+
+static int ll_getegid(lua_State *L) { RET_INT(getegid()); }
 
 static int ll_getcwd(lua_State *L) { 
 	char buf[4096];
@@ -340,6 +344,8 @@ static const struct luaL_Reg l5lib[] = {
 	//
 	{"getpid", ll_getpid},
 	{"getppid", ll_getppid},
+	{"geteuid", ll_geteuid},
+	{"getegid", ll_getegid},
 	{"chdir", ll_chdir},
 	{"getcwd", ll_getcwd},
 	{"setenv", ll_setenv},
