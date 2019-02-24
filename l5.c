@@ -88,7 +88,7 @@ static int ll_mbget(lua_State *L) {
 	int64_t idx = luaL_optinteger(L, 2, 1);
 	int64_t len = luaL_optinteger(L, 3, size);
 	if ((idx+len) > size + 1) LERR("out of range");
-	RET_STRN(mb+8, len);
+	RET_STRN(mb + 8 + (idx - 1), len);
 }
 
 static int ll_mbset(lua_State *L) {
