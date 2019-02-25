@@ -42,11 +42,23 @@ lstat5(pathname) => mode, size, mtime, uid, gid
 lstatraw(pathname) => raw struct stat as a string
 
 open() => fd
+read(fd, buf, count) => n
+read4k(fd) => string
+write(fd, str) => n
+close(fd)
 
 ioctl(fd, cmd, arg_in) => arg_out
 
 poll(pollset, nfds, timeout) => n
 pollin(fd, timeout) => n -- monitor only one input fd
+
+socket()
+bind()
+listen()
+accept()
+connect()
+getsockname(fd) => sockaddr
+getpeername(fd) => sockaddr
 
 -- In case of error, most functions return nil, errno.
 
