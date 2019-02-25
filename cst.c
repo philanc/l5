@@ -24,7 +24,9 @@
 void main() {
 	printf("---\n");
 	dispint(PATH_MAX)
+	dispsize(int)
 	dispsize(long)
+	dispsize(long long)
 	dispsize(off_t)
 	dispsize(uid_t)
 	dispsize(mode_t)
@@ -33,7 +35,8 @@ void main() {
 	dispsize(dev_t)
 	dispsize(blksize_t)
 	dispsize(blkcnt_t)
-	dispsize(__time_t)
+	//~ dispsize(__time_t)
+	dispsize(time_t)
 	dispsize(struct dirent)
 	dispsize(struct stat)
 	dispsize(struct timespec)

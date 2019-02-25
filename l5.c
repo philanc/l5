@@ -196,12 +196,10 @@ static int ll_closedir(lua_State *L) {
 	if (r == -1) RET_ERRNO; else RET_TRUE;
 }
 
-// ??? chg to lstat3() => mode, size, mtime  ???
-
-static int ll_lstat5(lua_State *L) {
-	// lua api: lstat5(path [,statflag:int])
+static int ll_lstat3(lua_State *L) {
+	// lua api: lstat3(path [,statflag:int])
 	// if statflag=1: do stat(). default: do lstat
-	// return mode, size, mtime(sec), ctime(sec), gid|uid
+	// return mode, size, mtime(sec)
 	struct stat buf;
 	int r;
 	const char *pname = luaL_checkstring(L, 1);
@@ -212,10 +210,7 @@ static int ll_lstat5(lua_State *L) {
 	lua_pushinteger(L, buf.st_mode);
 	lua_pushinteger(L, buf.st_size);
 	lua_pushinteger(L, buf.st_mtim.tv_sec);
-	lua_pushinteger(L, buf.st_ctim.tv_sec);
-	uint64_t m = ((uint64_t)buf.st_gid << 32) | (uint64_t)buf.st_uid;
-	lua_pushinteger(L, m);
-	return 5;
+	return 3;
 }
 
 static int ll_lstatraw(lua_State *L) {
@@ -354,7 +349,7 @@ static const struct luaL_Reg l5lib[] = {
 	{"opendir", ll_opendir},
 	{"readdir", ll_readdir},
 	{"closedir", ll_closedir},
-	{"lstat5", ll_lstat5},
+	{"lstat3", ll_lstat3},
 	{"lstatraw", ll_lstatraw},
 	//
 	{"open", ll_open},

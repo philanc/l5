@@ -53,12 +53,10 @@ end
 
 function test_stat()
 	-- assume the current dir is "some/path/l5" and contains l5.c
-	local mode, size, mtim, ctim, uidgid = l5.lstat5("l5.c")
-	he.printf("mode: %o  size: %d", mode, size)
-	he.printf("mtim: %s   ctim: %s", he.isodate(mtim), he.isodate(ctim))
-	local uid, gid = uidgid & 0xffffffff, uidgid >> 32
-	he.printf("uid %d, gid %d", uid, gid)
-	s = spack("I8I8I8I8I8", mode, uidgid, size, mtim, ctim)
+	local mode, size, mtim = l5.lstat3("l5.c")
+	he.printf("mode: %o  size: %d  mtim: %s", 
+		mode, size, he.isodate19(mtim))
+	s = spack("I8I8I8", mode, size, mtim)
 	print(he.stohex(s, 8))
 	print("--")
 	print(he.stohex(l5.lstatraw("l5.c"), 8))
