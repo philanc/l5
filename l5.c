@@ -16,12 +16,13 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 
 #include <sys/types.h>	// getpid
 #include <sys/stat.h>	// stat
-#include <unistd.h>	// getpid getcwd getuid.. readlink
+#include <unistd.h>	// getpid getcwd getuid.. readlink read
 #include <errno.h>	// errno
 #include <dirent.h>	// opendir...
 #include <fcntl.h>	// open
 #include <sys/ioctl.h>	// ioctl
 #include <poll.h>	// poll
+#include <sys/socket.h>	// socket..
 
 #include "lua.h"
 #include "lauxlib.h"
@@ -40,6 +41,10 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 //~ typedef unsigned long u32;
 //~ typedef unsigned long long u64;
 
+
+// API constants
+
+#define READBUFSIZE 4096
 
 // default timeout: 10 seconds  (poll, ...)
 #define DEFAULT_TIMEOUT 10000
@@ -246,6 +251,50 @@ static int ll_open(lua_State *L) {
 	RET_INT(r);
 }
 
+static int ll_close(lua_State *L) {
+	int fd = luaL_checkinteger(L, 1);
+	int r = close(fd);
+	if (r == -1) RET_ERRNO; else RET_TRUE;
+}
+
+static int ll_read(lua_State *L) {
+	// lua api: read(fd, buf, count)
+	// attempt to read up to count bytes into buffer buf
+	// (the buffer is a memory block (mb) - see mbnew() above.
+	// return number of read bytes or nil, errno
+	int fd = luaL_checkinteger(L, 1);
+	char *mb = lua_touserdata(L, 2);
+	int count = luaL_checkinteger(L, 3);
+	if (count > MBSIZE(mb)) LERR("out of range");
+	int n = read(fd, MBPTR(mb), count);
+	if (n == -1) RET_ERRNO;
+	RET_INT(n);
+}
+
+static int ll_read4k(lua_State *L) {
+	// lua api:  read4k(fd) => readbytes
+	// attempt to read 4,096 bytes (ie. 4kb)
+	// return read bytes as a string or nil, errno
+	char buf[4096];
+	int fd = luaL_checkinteger(L, 1);
+	int n = read(fd, buf, 4096);
+	if (n == -1) RET_ERRNO;
+	RET_STRN(buf, n);
+}
+
+static int ll_write(lua_State *L) {
+	// lua api: write(fd, str)
+	// attempt to write all the bytes in string str
+	// return number of bytes actually written, or nil, errno
+	int fd = luaL_checkinteger(L, 1);
+	int64_t len;
+	const char *str = luaL_checklstring(L, 2, &len);	
+	int n = write(fd, str, len);
+	if (n == -1) RET_ERRNO;
+	RET_INT(n);
+}
+
+
 #define IOCTLBUFLEN 1024
 
 static int ll_ioctl(lua_State *L) {
@@ -299,28 +348,44 @@ static int ll_pollin(lua_State *L) {
 	RET_INT(n);
 }
 
+//----------------------------------------------------------------------
+// socket functions
 
-/*
-
-
-static int ll_pollset_new(lua_State *L) {
-	// lua api: pollset_new(fdn) => u | nil, errno
-	int fdn = luaL_checkinteger(L, 1);
-	int usize = (fdn +1) * sizeof(struct pollfd);
-	struct pollfd *pfd = lua_newuserdata(L, usize);
-	if (pfd == NULL) { errno = ENOMEM; RET_ERRNO; }
-	// 1st pollfd is used only to store total number of elements
-	// for get/set bound checks
-	pfd->fd = fdn; 
-	return 1;
+static int ll_socket(lua_State *L) {
+}
+static int ll_bind(lua_State *L) {
+}
+static int ll_listen(lua_State *L) {
+}
+static int ll_accept(lua_State *L) {
+}
+static int ll_connect(lua_State *L) {
 }
 
-static int ll_pollset_get(lua_State *L) {
-	// lua api: pollset_get(pfd, i) => fd, events, revents | nil, errno
-	struct pollfd *pfd = lua_touserdata(L, 1);
-	int fdn = pfd->fd; // get total number of elements
+static int ll_getsockname(lua_State *L) {
+	// get the address a socket is bound to
+	// lua api: getsockname(fd) => sockaddr | nil, errno
+	// return raw socket address (struct sockaddr) as a string 
+	int fd = luaL_checkinteger(L, 1);
+	struct sockaddr addr;
+	socklen_t len = sizeof(addr); //enough for ip4&6 addr
+	int n = getsockname(fd, &addr, &len);
+	if (n == -1) RET_ERRNO;
+	RET_STRN((char *)&addr, len);
+}
 	
-*/
+static int ll_getpeername(lua_State *L) {
+	// get the address of the peer connected to socket fd
+	// lua api: getpeername(fd) => sockaddr | nil, errno
+	// return raw socket address (struct sockaddr) as a string 
+	int fd = luaL_checkinteger(L, 1);
+	struct sockaddr addr;
+	socklen_t len = sizeof(addr); //enough for ip4&6 addr
+	int n = getsockname(fd, &addr, &len);
+	if (n == -1) RET_ERRNO;
+	RET_STRN((char *)&addr, len);
+}
+	
 
 
 		
@@ -364,13 +429,23 @@ static const struct luaL_Reg l5lib[] = {
 	{"lstatraw", ll_lstatraw},
 	//
 	{"open", ll_open},
+	{"close", ll_close},
+	{"read", ll_read},
+	{"read4k", ll_read4k},
+	{"write", ll_write},
+	//
 	{"ioctl", ll_ioctl},
 	{"poll", ll_poll},
 	{"pollin", ll_pollin},
 	//
-
-
-		
+	{"socket", ll_socket},
+	{"bind", ll_bind},
+	{"listen", ll_listen},
+	{"accept", ll_accept},
+	{"connect", ll_connect},
+	{"getsockname", ll_getsockname},
+	{"getpeername", ll_getpeername},
+	//
 	{NULL, NULL},
 };
 

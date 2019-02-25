@@ -48,9 +48,10 @@ ioctl(fd, cmd, arg_in) => arg_out
 poll(pollset, nfds, timeout) => n
 pollin(fd, timeout) => n -- monitor only one input fd
 
+-- In case of error, most functions return nil, errno.
+
 ```
 
-In case of error, most functions return nil, errno.
 
 
 ### License
