@@ -16,7 +16,7 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 
 #include <sys/types.h>	// getpid
 #include <sys/stat.h>	// stat
-#include <unistd.h>	// getpid getcwd getresuid,
+#include <unistd.h>	// getpid getcwd getuid.. readlink
 #include <errno.h>	// errno
 #include <dirent.h>	// opendir...
 #include <fcntl.h>	// open
@@ -196,21 +196,31 @@ static int ll_closedir(lua_State *L) {
 	if (r == -1) RET_ERRNO; else RET_TRUE;
 }
 
-static int ll_lstat3(lua_State *L) {
-	// lua api: lstat3(path [,statflag:int])
+static int ll_readlink(lua_State *L) { 
+	char buf[4096];
+	const char *pname = luaL_checkstring(L, 1);
+	int n = readlink(pname, buf, 4096);
+	if (n == -1) RET_ERRNO; 
+	RET_STRN(buf, n);
+}
+
+static int ll_lstat5(lua_State *L) {
+	// lua api: lstat5(path [,statflag:int])
 	// if statflag=1: do stat(). default: do lstat
-	// return mode, size, mtime(sec)
+	// return mode, size, mtime(sec), uid, gid
 	struct stat buf;
 	int r;
 	const char *pname = luaL_checkstring(L, 1);
 	lua_Integer statflag = luaL_optinteger(L, 2, 0);
 	if (statflag != 0) r = stat(pname, &buf);
-	else r = stat(pname, &buf);
+	else r = lstat(pname, &buf);
 	if (r == -1) RET_ERRNO; 
 	lua_pushinteger(L, buf.st_mode);
 	lua_pushinteger(L, buf.st_size);
 	lua_pushinteger(L, buf.st_mtim.tv_sec);
-	return 3;
+	lua_pushinteger(L, buf.st_uid);
+	lua_pushinteger(L, buf.st_gid);
+	return 5;
 }
 
 static int ll_lstatraw(lua_State *L) {
@@ -349,7 +359,8 @@ static const struct luaL_Reg l5lib[] = {
 	{"opendir", ll_opendir},
 	{"readdir", ll_readdir},
 	{"closedir", ll_closedir},
-	{"lstat3", ll_lstat3},
+	{"readlink", ll_readlink},
+	{"lstat5", ll_lstat5},
 	{"lstatraw", ll_lstatraw},
 	//
 	{"open", ll_open},

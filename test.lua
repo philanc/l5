@@ -53,10 +53,21 @@ end
 
 function test_stat()
 	-- assume the current dir is "some/path/l5" and contains l5.c
-	local mode, size, mtim = l5.lstat3("l5.c")
-	he.printf("mode: %o  size: %d  mtim: %s", 
-		mode, size, he.isodate19(mtim))
-	s = spack("I8I8I8", mode, size, mtim)
+	os.execute("rm -f l5symlink; ln -s l5.c l5symlink")
+	local lmode, lsize, lmtim, luid, lgid = l5.lstat5("l5symlink")
+	he.printf("mode: %o  size: %d  mtim: %s  uid: %d gid: %d", 
+		lmode, lsize, he.isodate19(lmtim), luid, lgid)
+	assert(lsize == 4)
+	assert(lmode & 0xf000 == 0xa000) -- type is symlink
+	assert(lmode & 0xfff == 0x01ff) -- perm is '0777'
+	local target = l5.readlink("l5symlink")
+	assert(target == "l5.c")
+	local mode, size, mtim, uid, gid = l5.lstat5("l5.c")
+	he.printf("mode: %o  size: %d  mtim: %s  uid: %d gid: %d", 
+		mode, size, he.isodate19(mtim), uid, gid)
+	assert(mode & 0xf000 == 0x8000)
+	assert(uid == luid and gid == lgid)
+	s = spack("I8I8I8I8I8", mode, size, mtim, uid, gid)
 	print(he.stohex(s, 8))
 	print("--")
 	print(he.stohex(l5.lstatraw("l5.c"), 8))
