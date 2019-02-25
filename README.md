@@ -1,4 +1,4 @@
-# l5
+# L5
 
 L5, a **Low-Level Linux Library for Lua** is a minimal binding to low-level OS function for Linux, mostly basic Linux system calls, eg. open(2), ioctl(2), poll(2), etc. This is intended to be just one level above the Linux syscall interface.
 
@@ -20,6 +20,38 @@ The library targets **Lua 5.3+** with the default 64-bit integers.
 - this is a great learning experience,
 
 - this is a step to build a minimal, Lua-based userspace for Linux in IoT space. Ummm..., paraphrasing MLK, this is taking the first step even when I don't see the whole staircase :-)
+
+### Available functions
+
+```
+getpid() =>  process id
+getppid() => parent process id
+geteuid() => effective process uid
+getegid() => effective process gid
+getcwd() =>  current dir pathname
+
+chdir(pathname)
+setenv(varname, value)
+unsetenv(varname)
+
+opendir(pathname) => dfd
+readdir(dfd) => pathname, filetype
+closedir(dfd)
+readlink(pathname) => target pathname
+lstat5(pathname) => mode, size, mtime, uid, gid
+lstatraw(pathname) => raw struct stat as a string
+
+open() => fd
+
+ioctl(fd, cmd, arg_in) => arg_out
+
+poll(pollset, nfds, timeout) => n
+pollin(fd, timeout) => n -- monitor only one input fd
+
+```
+
+In case of error, most functions return nil, errno.
+
 
 ### License
 
