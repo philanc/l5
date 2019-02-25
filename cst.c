@@ -24,6 +24,7 @@
 void main() {
 	printf("---\n");
 	dispint(PATH_MAX)
+	dispsize(long)
 	dispsize(off_t)
 	dispsize(uid_t)
 	dispsize(mode_t)

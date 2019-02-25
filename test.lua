@@ -6,6 +6,9 @@ he = require "he" -- at https://github.com/philanc/he
 
 l5 = require "l5"
 
+
+local spack, sunpack = string.pack, string.unpack
+
 ------------------------------------------------------------------------
 
 function test_mb()
@@ -55,7 +58,10 @@ function test_stat()
 	he.printf("mtim: %s   ctim: %s", he.isodate(mtim), he.isodate(ctim))
 	local uid, gid = uidgid & 0xffffffff, uidgid >> 32
 	he.printf("uid %d, gid %d", uid, gid)
-
+	s = spack("I8I8I8I8I8", mode, uidgid, size, mtim, ctim)
+	print(he.stohex(s, 8))
+	print("--")
+	print(he.stohex(l5.lstatraw("l5.c"), 8))
 	print("test_stat: ok.")
 end
 
