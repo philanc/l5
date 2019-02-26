@@ -130,7 +130,8 @@ function test_mode()
 	end
 	-- reset former mode
 	setmode(mode)
-	print('\rback to normal cooked mode.')
+	print("\rback to normal cooked mode.")
+	print("test_mode: ok.")
 end
 
 ------------------------------------------------------------------------

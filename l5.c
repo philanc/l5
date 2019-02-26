@@ -2,13 +2,13 @@
 // ---------------------------------------------------------------------
 /*   
 
-l5  - Low-Level Linux Lua Lib
+L5  - Low-Level Linux Lua Lib
 
 This is for Lua 5.3+ only, built with default 64-bit integers
 
 */
 
-#define L5_VERSION "l5-0.0"
+#define L5_VERSION "L5-0.1"
 
 #include <stdlib.h>	// setenv
 #include <stdio.h>
@@ -24,6 +24,7 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 #include <poll.h>	// poll
 #include <time.h>	// nanosleep
 #include <sys/socket.h>	// socket..
+#include <netdb.h>	// getaddrinfo
 
 #include "lua.h"
 #include "lauxlib.h"
@@ -33,6 +34,8 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 #define LERR(msg) return luaL_error(L, msg)
 
 #define RET_ERRNO return (lua_pushnil(L), lua_pushinteger(L, errno), 2)
+#define RET_ERRINT(n) return (lua_pushnil(L), lua_pushinteger(L, n), 2)
+#define RET_ERRMSG(msg) return (lua_pushnil(L), lua_pushstring(L, msg), 2)
 #define RET_TRUE return (lua_pushboolean(L, 1), 1)
 #define RET_INT(i) return (lua_pushinteger(L, (i)), 1)
 #define RET_STRN(s, slen) return (lua_pushlstring (L, (s), (slen)), 1)
@@ -450,8 +453,62 @@ static int ll_getpeername(lua_State *L) {
 	if (n == -1) RET_ERRNO;
 	RET_STRN((char *)&addr, len);
 }
-	
 
+static int ll_getaddrinfo(lua_State *L) {
+	// interface to DNS:
+	// get a list of addresses corresponding to a hostname and port
+	// lua api:  
+	// getaddrinfo(hostname, port [, flags]) => { sockaddr, ... }
+	// hostname and port are strings, flags is int
+	// if error, return nil, errcode (EAI_* values defined in netdb.h)
+	const char *host = luaL_checkstring(L, 1);
+	const char *service = luaL_checkstring(L, 2);
+	int flags = luaL_optinteger(L, 2, 0);
+	struct addrinfo hints;
+	struct addrinfo *result, *rp;	
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_flags = flags;
+	hints.ai_family = AF_UNSPEC;	 /* Allow IPv4 or IPv6 */
+	//~ hints.ai_socktype = SOCK_STREAM;
+	int n = getaddrinfo(host, service, &hints, &result);
+	if (n) RET_ERRINT(n);
+	// build the table of the returned addresses
+	lua_newtable(L);
+	n = 1;
+	for (rp = result; rp != NULL; rp = rp->ai_next) {
+		lua_pushinteger (L, n);
+		lua_pushlstring(L, 
+			(const char *)rp->ai_addr, 
+			rp->ai_addrlen);
+		lua_settable(L, -3);
+		n += 1;
+	}	
+	// free the address list
+	freeaddrinfo(result);
+	// return the table
+	return 1;
+}
+
+int ll_getnameinfo(lua_State *L) {
+	// converts a raw socket address (sockaddr) into a host and port
+	// lua api:  getnameinfo(sockaddr [, numflag]) => hostname, port
+	// return hostname and port as strings.
+	// if numflag is true, the numeric form of hostname is returned
+	// (default to false)
+	//   
+	char host[512];
+	char serv[16];
+	size_t addrlen;
+	const char *addr = luaL_checklstring(L, 1, &addrlen);
+	int numflag = lua_toboolean(L, 2);
+	int flags = (numflag ? NI_NUMERICHOST : 0) | NI_NUMERICSERV;
+	int n = getnameinfo((const struct sockaddr *)addr, addrlen, 
+			host, sizeof(host), serv, sizeof(serv), flags);
+	if (n) RET_ERRINT(n);
+	lua_pushstring(L, host);
+	lua_pushstring(L, serv);
+	return 2;	
+}
 
 		
 	
@@ -513,6 +570,8 @@ static const struct luaL_Reg l5lib[] = {
 	{"connect", ll_connect},
 	{"getsockname", ll_getsockname},
 	{"getpeername", ll_getpeername},
+	{"getaddrinfo", ll_getaddrinfo},
+	{"getnameinfo", ll_getnameinfo},
 	//
 	{NULL, NULL},
 };
