@@ -24,6 +24,8 @@
 void main() {
 	printf("---\n");
 	dispint(PATH_MAX)
+	char *p;
+	dispsize((char *)p)
 	dispsize(int)
 	dispsize(long)
 	dispsize(long long)

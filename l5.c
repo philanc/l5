@@ -78,13 +78,19 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 #define MBNAME "mb_memory_block"
 
 static int ll_mbnew(lua_State *L) {
+	// lua api: mbnew(size) => mb, ptr
+	// return a memory block with the given size and a pointer 
+	// to the beginning of the block as a Lua integer
+	// the memory block is zeroed.
 	size_t size = luaL_checkinteger(L, 1);
 	if ((size % 8) != 0) LERR("mbnew: size must be multiple of 8");
 	char *mb = (char *) lua_newuserdata(L, size + 8);
 	MBSIZE(mb) = size;
+	memset(mb+8, 0, size); 
 	luaL_getmetatable(L, MBNAME);
 	lua_setmetatable(L, -2);
-	return 1;
+	lua_pushinteger(L, (int64_t)(mb + 8));
+	return 2;
 }
 
 static int ll_mbget(lua_State *L) {
@@ -234,6 +240,17 @@ static int ll_kill(lua_State *L) {
 	// lua api:  kill(pid, signal)
 	int r = kill(luaL_checkinteger(L, 1), luaL_checkinteger(L, 2));
 	if (r == -1) RET_ERRNO; else RET_TRUE;
+}
+
+static int ll_execve(lua_State *L) {
+	// lua api: execve(pname, argv_mb, envp_mb) => nothing | nil, errno
+	// the calling program must prepare memory blocks (mb) containing
+	// valid argv[] and envp[]
+	const char *pname = luaL_checkstring(L, 1);
+	char *argv_mb = (char *)lua_touserdata(L, 2);
+	char *envp_mb = (char *)lua_touserdata(L, 3);
+	execve(pname, MBPTR(argv_mb), MBPTR(envp_mb));
+	RET_ERRNO; // execve returns only on error
 }
 
 static int ll_opendir(lua_State *L) {
@@ -614,6 +631,7 @@ static const struct luaL_Reg l5lib[] = {
 	{"fork", ll_fork},
 	{"wait", ll_wait},
 	{"kill", ll_kill},
+	{"execve", ll_execve},
 	//
 	{"opendir", ll_opendir},
 	{"readdir", ll_readdir},
