@@ -246,18 +246,37 @@ static int ll_lstat5(lua_State *L) {
 	return 5;
 }
 
-static int ll_lstatraw(lua_State *L) {
-	// lua api: lstatraw(path [,statflag:int])
+static int ll_lstat(lua_State *L) {
+	// lua api: lstatraw(path, tbl, [,statflag:int])
+	// tbl is a table that is to be filled with stat values
+	// indices in tbl: dev=1 ino=2 mode=3 nlink=4 uid=5 gid=6
+	// rdev=7 size=8 blksize=9 blocks=10 atime=11 mtime=12 ctime=13
 	// if statflag=1: do stat(). default: do lstat
-	// return the raw struct stat as a string
+	// return tbl
 	struct stat buf;
 	int r;
 	const char *pname = luaL_checkstring(L, 1);
-	lua_Integer statflag = luaL_optinteger(L, 2, 0);
+	// ensure second arg is a table (LUA_TTABLE=5, see lua.h)
+	luaL_checktype(L, 2, 5);
+	lua_Integer statflag = luaL_optinteger(L, 3, 0);
 	if (statflag != 0) r = stat(pname, &buf);
 	else r = lstat(pname, &buf);
 	if (r == -1) RET_ERRNO; 
-	RET_STRN((char *)&buf, sizeof(buf));
+	lua_pushvalue(L, 2); // ensure tbl is top of stack - set values:
+	lua_pushinteger(L, buf.st_dev); lua_rawseti(L, -2, 1);
+	lua_pushinteger(L, buf.st_ino); lua_rawseti(L, -2, 2);
+	lua_pushinteger(L, buf.st_mode); lua_rawseti(L, -2, 3);
+	lua_pushinteger(L, buf.st_nlink); lua_rawseti(L, -2, 4);
+	lua_pushinteger(L, buf.st_uid); lua_rawseti(L, -2, 5);
+	lua_pushinteger(L, buf.st_gid); lua_rawseti(L, -2, 6);
+	lua_pushinteger(L, buf.st_rdev); lua_rawseti(L, -2, 7);
+	lua_pushinteger(L, buf.st_size); lua_rawseti(L, -2, 8);
+	lua_pushinteger(L, buf.st_blksize); lua_rawseti(L, -2, 9);
+	lua_pushinteger(L, buf.st_blocks); lua_rawseti(L, -2, 10);
+	lua_pushinteger(L, buf.st_atim.tv_sec); lua_rawseti(L, -2, 11);
+	lua_pushinteger(L, buf.st_mtim.tv_sec); lua_rawseti(L, -2, 12);
+	lua_pushinteger(L, buf.st_ctim.tv_sec); lua_rawseti(L, -2, 13);
+	return 1;
 }
 
 //----------------------------------------------------------------------
@@ -292,10 +311,14 @@ static int ll_read(lua_State *L) {
 	RET_INT(n);
 }
 
-static int ll_read4k(lua_State *L) {
+static int ll_read4k(lua_State *L) { 
 	// lua api:  read4k(fd) => readbytes
 	// attempt to read 4,096 bytes (ie. 4kb)
 	// return read bytes as a string or nil, errno
+	//
+	//--- KEEP IT??  --- can be implemented with a unique mb buffer:
+	// mb=mbnew(4096); n=read(fd, mb, 4096); return mb:get(1, n)
+	//
 	char buf[4096];
 	int fd = luaL_checkinteger(L, 1);
 	int n = read(fd, buf, 4096);
@@ -316,6 +339,7 @@ static int ll_write(lua_State *L) {
 }
 
 
+// how to ensure it's enough? --- rewrite with a mb?
 #define IOCTLBUFLEN 1024
 
 static int ll_ioctl(lua_State *L) {
@@ -551,7 +575,7 @@ static const struct luaL_Reg l5lib[] = {
 	{"closedir", ll_closedir},
 	{"readlink", ll_readlink},
 	{"lstat5", ll_lstat5},
-	{"lstatraw", ll_lstatraw},
+	{"lstat", ll_lstat},
 	//
 	{"open", ll_open},
 	{"close", ll_close},
