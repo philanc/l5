@@ -41,7 +41,7 @@ readdir(dfd) => pathname, filetype
 closedir(dfd)
 readlink(pathname) => target pathname
 lstat5(pathname) => mode, size, mtime, uid, gid
-lstatraw(pathname) => raw struct stat as a string
+lstat(pathname, tbl) => tbl  --a list of stat fields
 
 open() => fd
 read(fd, buf, count) => n
