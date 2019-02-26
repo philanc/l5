@@ -30,11 +30,16 @@ geteuid() => effective process uid
 getegid() => effective process gid
 getcwd() =>  current dir pathname
 
+errno() => errno value
+
 chdir(pathname)
 setenv(varname, value)
 unsetenv(varname)
 
 msleep(millisecs)
+fork() => pid
+wait() => pid, status
+kill(pid, sig)
 
 opendir(pathname) => dfd
 readdir(dfd) => pathname, filetype

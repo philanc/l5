@@ -231,6 +231,7 @@ static int ll_wait(lua_State *L) {
 }
 
 static int ll_kill(lua_State *L) {
+	// lua api:  kill(pid, signal)
 	int r = kill(luaL_checkinteger(L, 1), luaL_checkinteger(L, 2));
 	if (r == -1) RET_ERRNO; else RET_TRUE;
 }
