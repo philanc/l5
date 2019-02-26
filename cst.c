@@ -23,12 +23,14 @@
 
 void main() {
 	printf("---\n");
-	dispint(PATH_MAX)
 	char *p;
 	dispsize((char *)p)
 	dispsize(int)
 	dispsize(long)
 	dispsize(long long)
+	dispsize(pid_t)
+
+	// stat
 	dispsize(off_t)
 	dispsize(uid_t)
 	dispsize(mode_t)
@@ -39,9 +41,14 @@ void main() {
 	dispsize(blkcnt_t)
 	//~ dispsize(__time_t)
 	dispsize(time_t)
-	dispsize(struct dirent)
-	dispsize(struct stat)
 	dispsize(struct timespec)
+	dispsize(struct stat)
+
+	// path, dirs
+	dispint(PATH_MAX)
+	dispsize(struct dirent)
+
+	// termios
 	dispsize(struct termios)
 	dispintx(~(BRKINT | ICRNL | INPCK | ISTRIP | IXON))
 	dispintx(~(OPOST))
@@ -55,13 +62,14 @@ void main() {
 	dispint((char*)&(tos.c_cc) - (char*)&tos)
 	dispint((char*)&(tos.c_cc[VTIME]) - (char*)&tos)
 	
+	// ioctl
 	///f/p3/git/tmp/musl-1.1.18/include/bits/ioctl.h
 	dispintx(TCGETS) // 0x5401 
 	dispintx(TCSETS) // 0x5402	
-
+	
+	// poll
 	dispsize(struct pollfd)
 	
-	dispsize(pid_t)
 
 	printf("---\n");
 }

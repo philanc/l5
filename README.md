@@ -40,6 +40,7 @@ msleep(millisecs)
 fork() => pid
 wait() => pid, status
 kill(pid, sig)
+execve(pname, argv, envp)
 
 opendir(pathname) => dfd
 readdir(dfd) => pathname, filetype

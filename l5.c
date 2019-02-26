@@ -96,32 +96,32 @@ static int ll_mbnew(lua_State *L) {
 static int ll_mbget(lua_State *L) {
 	// the memory block is seen as a byte array
 	// lua api:  mb:get(idx, len)
-	// return the len bytes at index idx as a string
-	// byte index startx at 1
+	// return the len bytes at offset idx as a string
+	// byte offset start at 0
 	// if len is too large given mb size and idx, the function errors.
 	// if len is not provided it deafults to the mb size
-	// if idx is not provided, it defaults to 1
+	// if idx is not provided, it defaults to 0
 	// so mg:get() returns all the content of the mb as a string
 	char *mb = lua_touserdata(L, 1);
 	int64_t size = MBSIZE(mb);
-	int64_t idx = luaL_optinteger(L, 2, 1);
+	int64_t idx = luaL_optinteger(L, 2, 0);
 	int64_t len = luaL_optinteger(L, 3, size);
-	if ((idx+len) > size + 1) LERR("out of range");
-	RET_STRN(mb + 8 + (idx - 1), len);
+	if ((idx+len) > size) LERR("out of range");
+	RET_STRN(mb + 8 + idx, len);
 }
 
 static int ll_mbset(lua_State *L) {
 	// the memory block is seen as a byte array
 	// lua api:  mb:set(idx, str)
-	// copy string str in mb at byte index idx (starting at 1) 
+	// copy string str in mb at byte offset idx (starting at 0) 
 	// if  string is too long to fit, the function errors.
 	char *mb = lua_touserdata(L, 1);
 	int64_t size = MBSIZE(mb);
 	int64_t idx = luaL_checkinteger(L, 2);
 	int64_t len;
 	const char *str = luaL_checklstring(L, 3, &len);
-	if ((idx+len) > size + 1) LERR("out of range");	
-	memcpy(mb + 8 + (idx - 1), str, len);
+	if ((idx+len) > size) LERR("out of range");	
+	memcpy(mb + 8 + idx, str, len);
 	RET_TRUE;
 }
 
@@ -136,26 +136,26 @@ static int ll_mbzero(lua_State *L) {
 	
 static int ll_mbseti(lua_State *L) {
 	// lua api: mb:seti(idx, i)
-	// mb is seen as an array of int64, starting at index 1
-	// mb:seti(idx, i) sets element at index idx to the value i
+	// mb is seen as an array of int64, starting at offset 0
+	// mb:seti(idx, i) sets element at offset idx to the value i
 	int64_t *mb = lua_touserdata(L, 1);
 	int64_t idx = luaL_checkinteger(L, 2);
 	int64_t i = luaL_checkinteger(L, 3);
 	int64_t max = MBSIZE(mb) / 8;
-	if ((idx < 1) || (idx > max)) LERR("out of range");
-	*(mb + idx) = i;
+	if ((idx < 0) || (idx > max-1)) LERR("out of range");
+	*(mb + 1 + idx) = i;
 	RET_TRUE;
 }
 
 static int ll_mbgeti(lua_State *L) {
 	// lua api: mb:geti(idx)
-	// mb is seen as an array of int64, starting at index 1
-	// mb:geti(idx) returns the element at index idx
+	// mb is seen as an array of int64, starting at offset 0
+	// mb:geti(idx) returns the element at offset idx
 	int64_t *mb = lua_touserdata(L, 1);
 	int64_t idx = luaL_checkinteger(L, 2);
 	int64_t max = MBSIZE(mb) / 8;
-	if ((idx < 1) || (idx > max)) LERR("out of range");
-	RET_INT(*(mb + idx));
+	if ((idx < 0) || (idx > max-1)) LERR("out of range");
+	RET_INT(*(mb + 1 + idx));
 }
 
 //------------------------------------------------------------

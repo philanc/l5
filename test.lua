@@ -20,9 +20,9 @@ function test_mb()
 	assert(mb:zero())
 	assert(mb:geti(12) == 0)
 	mb:zero()
-	assert(mb:set(17, "abc"))
-	assert(mb:get(17, 5) == "abc\0\0")
-	assert(mb:geti(3) & 0xff == 97) -- !! little endian only :-)
+	assert(mb:set(16, "abc"))
+	assert(mb:get(16, 5) == "abc\0\0")
+	assert(mb:geti(2) & 0xff == 97) -- !! little endian only :-)
 	print("test_mb: ok.")
 end
 
