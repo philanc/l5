@@ -58,6 +58,8 @@ void main() {
 	dispintx(TCSETS) // 0x5402	
 
 	dispsize(struct pollfd)
+	
+	dispsize(pid_t)
 
 	printf("---\n");
 }

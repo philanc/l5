@@ -25,6 +25,9 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 #include <time.h>	// nanosleep
 #include <sys/socket.h>	// socket..
 #include <netdb.h>	// getaddrinfo
+#include <signal.h>	// kill
+#include <sys/wait.h>	// waitpid 
+
 
 #include "lua.h"
 #include "lauxlib.h"
@@ -160,6 +163,14 @@ static int ll_geteuid(lua_State *L) { RET_INT(geteuid()); }
 
 static int ll_getegid(lua_State *L) { RET_INT(getegid()); }
 
+static int ll_errno(lua_State *L) {
+	// lua api: errno() => errno value; 
+	//          errno(n): set errno to n (main use: errno(0))
+	int r = luaL_optinteger(L, 1, -1);
+	if (r != -1) errno = r; 
+	RET_INT(errno);
+}
+
 static int ll_getcwd(lua_State *L) { 
 	char buf[4096];
 	char *p = getcwd(buf, 4096);
@@ -192,6 +203,36 @@ static int ll_msleep(lua_State *L) {
 	int n = nanosleep(&req, NULL);
 	if (n == -1) RET_ERRNO;
 	RET_TRUE;
+}
+
+static int ll_fork(lua_State *L) {
+	// fork the current process (fork(2))
+	// lua api: fork() => pid | nil, errno
+	// pid in the parent: pid of the child, in the child: 0
+	int pid = fork();
+	if (pid == -1) RET_ERRNO; 
+	RET_INT(pid);
+}
+
+static int ll_wait(lua_State *L) {
+	// wait for state changes in a child process (wait(2))
+	// lua api: wait() => pid, status | nil, errno
+	// pid and status are integers
+	// (for status consts and macros, see sys/wait.h)
+	//	exitstatus: (status & 0xff00) >> 8
+	//	termsig: status & 0x7f
+	//	coredump: status & 0x80
+	int status = 0;
+	int pid = wait(&status);
+	if (pid == -1) RET_ERRNO; 
+	lua_pushinteger(L, pid);
+	lua_pushinteger(L, status);
+	return 2;
+}
+
+static int ll_kill(lua_State *L) {
+	int r = kill(luaL_checkinteger(L, 1), luaL_checkinteger(L, 2));
+	if (r == -1) RET_ERRNO; else RET_TRUE;
 }
 
 static int ll_opendir(lua_State *L) {
@@ -562,12 +603,16 @@ static const struct luaL_Reg l5lib[] = {
 	{"getppid", ll_getppid},
 	{"geteuid", ll_geteuid},
 	{"getegid", ll_getegid},
+	{"errno", ll_errno},
 	{"chdir", ll_chdir},
 	{"getcwd", ll_getcwd},
 	{"setenv", ll_setenv},
 	{"unsetenv", ll_unsetenv},
 	//
 	{"msleep", ll_msleep},
+	{"fork", ll_fork},
+	{"wait", ll_wait},
+	{"kill", ll_kill},
 	//
 	{"opendir", ll_opendir},
 	{"readdir", ll_readdir},
