@@ -67,10 +67,10 @@ function test_stat()
 		mode, size, he.isodate19(mtim), uid, gid)
 	assert(mode & 0xf000 == 0x8000)
 	assert(uid == luid and gid == lgid)
-	s = spack("I8I8I8I8I8", mode, size, mtim, uid, gid)
-	print(he.stohex(s, 8))
-	print("--")
-	print(he.stohex(l5.lstatraw("l5.c"), 8))
+	t = l5.lstat("l5.c", {})
+	assert(t[3]==mode and t[5]==uid and t[6]==gid and t[8]==size
+		and t[12]==mtim)
+
 	print("test_stat: ok.")
 end
 

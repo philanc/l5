@@ -338,7 +338,6 @@ static int ll_write(lua_State *L) {
 	RET_INT(n);
 }
 
-
 // how to ensure it's enough? --- rewrite with a mb?
 #define IOCTLBUFLEN 1024
 
