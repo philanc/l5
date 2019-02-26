@@ -45,7 +45,7 @@ lstatraw(pathname) => raw struct stat as a string
 
 open() => fd
 read(fd, buf, count) => n
-read4k(fd) => string
+read4k(fd) => str -- read 4 kbytes
 write(fd, str) => n
 close(fd)
 
@@ -54,7 +54,7 @@ ioctl(fd, cmd, arg_in) => arg_out
 poll(pollset, nfds, timeout) => n
 pollin(fd, timeout) => n -- monitor only one input fd
 
-socket() => fd
+socket(domain, type, protocol) => fd
 setsockopt(fd, level, optname, optvalue)
 bind(fd, addr)
 listen(fd, backlog)
@@ -62,6 +62,8 @@ accept(fd) => clientfd
 connect(fd, addr)
 getsockname(fd) => sockaddr
 getpeername(fd) => sockaddr
+getaddrinfo(host, port) => {sockaddr, ...}
+getnameinfo(sockaddr) => host, port
 
 -- In case of error, most functions return nil, errno.
 

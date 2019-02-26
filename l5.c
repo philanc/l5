@@ -495,6 +495,7 @@ int ll_getnameinfo(lua_State *L) {
 	// return hostname and port as strings.
 	// if numflag is true, the numeric form of hostname is returned
 	// (default to false)
+	// if error, return nil, errcode (EAI_* values defined in netdb.h)
 	//   
 	char host[512];
 	char serv[16];
