@@ -22,6 +22,7 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 #include <fcntl.h>	// open
 #include <sys/ioctl.h>	// ioctl
 #include <poll.h>	// poll
+#include <time.h>	// nanosleep
 #include <sys/socket.h>	// socket..
 
 #include "lua.h"
@@ -44,7 +45,8 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 
 // API constants
 
-#define READBUFSIZE 4096
+// default backlog for listen()
+#define BACKLOG 32
 
 // default timeout: 10 seconds  (poll, ...)
 #define DEFAULT_TIMEOUT 10000
@@ -176,6 +178,19 @@ static int ll_unsetenv(lua_State *L) {
 	if (r == -1) RET_ERRNO; else RET_TRUE;
 }
 
+static int ll_msleep(lua_State *L) {
+	// lua api: msleep(fd, ms)
+	// suspend the execution for ms milliseconds
+	// return true, or nil, errno
+	int ms = luaL_checkinteger(L, 1);
+	struct timespec req;
+	req.tv_sec = ms / 1000;
+	req.tv_nsec = (ms % 1000) * 1000000;
+	int n = nanosleep(&req, NULL);
+	if (n == -1) RET_ERRNO;
+	RET_TRUE;
+}
+
 static int ll_opendir(lua_State *L) {
 	DIR *dp = opendir(luaL_checkstring(L, 1));
 	if (dp == NULL) RET_ERRNO;
@@ -241,6 +256,9 @@ static int ll_lstatraw(lua_State *L) {
 	if (r == -1) RET_ERRNO; 
 	RET_STRN((char *)&buf, sizeof(buf));
 }
+
+//----------------------------------------------------------------------
+// basic I/O
 
 static int ll_open(lua_State *L) {
 	const char *pname = luaL_checkstring(L, 1);
@@ -314,20 +332,19 @@ static int ll_ioctl(lua_State *L) {
 	RET_TRUE;
 }
 
-
-
-
-
 static int ll_poll(lua_State *L) {
 	// lua api: poll(pollsetmb, nfds, timeout) => n | nil, errno
 	// pollsetmb: an array of struct pollfd stored in a memory block (mb)
 	// ndfs: number of  pollfd in the pollset
 	// timeout:  timeout in millisecs
 	//
-	//~ struct pollfd *pfd = (void *)(lua_touserdata(L, 1);
-	//~ struct pollfd *pfd = MBPTR(;
-	
-
+	void *mb = (void *)lua_touserdata(L, 1);
+	int nfds = luaL_checkinteger(L, 2);
+	int timeout = luaL_optinteger(L, 3, DEFAULT_TIMEOUT); 
+	struct pollfd *pfd = MBPTR(mb);
+	int n = poll(pfd, nfds, timeout);
+	if (n < 0) RET_ERRNO;
+	RET_INT(n);
 }
 
 static int ll_pollin(lua_State *L) {
@@ -352,14 +369,62 @@ static int ll_pollin(lua_State *L) {
 // socket functions
 
 static int ll_socket(lua_State *L) {
+	// lua api: socket(domain, type, protocol) => fd
+	int domain = luaL_checkinteger(L, 1);
+	int sotype = luaL_checkinteger(L, 2);
+	int protocol = luaL_checkinteger(L, 3);
+	int fd = socket(domain, sotype, protocol);
+	if (fd < 0) RET_ERRNO;
+	RET_INT(fd);	
 }
+
+static int ll_setsockopt(lua_State *L) {
+	// lua api: setsockopt_int(fd, level, optname, intvalue)
+	int fd = luaL_checkinteger(L, 1);
+	int level = luaL_checkinteger(L, 2);
+	int optname = luaL_checkinteger(L, 3);
+	int optvalue = luaL_checkinteger(L, 4);
+	int r = setsockopt(fd, level, optname, &optvalue, sizeof(optvalue));
+	if (r < 0) RET_ERRNO; else RET_TRUE;
+}
+
+// will add a ll_setsockopt_str() to set option with 
+// a non-integer value, if needed.
+
 static int ll_bind(lua_State *L) {
+	// lua api: bind(fd, addr)
+	int fd = luaL_checkinteger(L, 1);
+	size_t len;
+	const char *addr = luaL_checklstring(L, 2, &len);
+	int r = bind(fd, (const struct sockaddr *)addr, len);
+	if (r < 0) RET_ERRNO; else RET_TRUE;
 }
+
 static int ll_listen(lua_State *L) {
+	// lua api: listen(fd, backlog)
+	int fd = luaL_checkinteger(L, 1);
+	int backlog = luaL_optinteger(L, 2, BACKLOG);
+	int r = listen(fd, backlog);
+	if (r < 0) RET_ERRNO; else RET_TRUE;
 }
+
 static int ll_accept(lua_State *L) {
+	// lua_api: accept(fd) => cfd
+	int fd = luaL_checkinteger(L, 1);
+	struct sockaddr addr;
+	socklen_t len = sizeof(addr); //enough for ip4&6 addr
+	int cfd = accept(fd, &addr, &len);
+	if (cfd < 0) RET_ERRNO;
+	RET_INT(cfd);
 }
+
 static int ll_connect(lua_State *L) {
+	// lua_api: connect(fd, addr)
+	int fd = luaL_checkinteger(L, 1);
+	size_t len;
+	const char *addr = luaL_checklstring(L, 2, &len);
+	int r = connect(fd, (const struct sockaddr *)addr, len);
+	if (r < 0) RET_ERRNO; else RET_TRUE;
 }
 
 static int ll_getsockname(lua_State *L) {
@@ -421,6 +486,8 @@ static const struct luaL_Reg l5lib[] = {
 	{"setenv", ll_setenv},
 	{"unsetenv", ll_unsetenv},
 	//
+	{"msleep", ll_msleep},
+	//
 	{"opendir", ll_opendir},
 	{"readdir", ll_readdir},
 	{"closedir", ll_closedir},
@@ -439,6 +506,7 @@ static const struct luaL_Reg l5lib[] = {
 	{"pollin", ll_pollin},
 	//
 	{"socket", ll_socket},
+	{"setsockopt", ll_setsockopt},
 	{"bind", ll_bind},
 	{"listen", ll_listen},
 	{"accept", ll_accept},

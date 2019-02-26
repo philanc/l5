@@ -34,6 +34,8 @@ chdir(pathname)
 setenv(varname, value)
 unsetenv(varname)
 
+msleep(millisecs)
+
 opendir(pathname) => dfd
 readdir(dfd) => pathname, filetype
 closedir(dfd)
@@ -52,11 +54,12 @@ ioctl(fd, cmd, arg_in) => arg_out
 poll(pollset, nfds, timeout) => n
 pollin(fd, timeout) => n -- monitor only one input fd
 
-socket()
-bind()
-listen()
-accept()
-connect()
+socket() => fd
+setsockopt(fd, level, optname, optvalue)
+bind(fd, addr)
+listen(fd, backlog)
+accept(fd) => clientfd
+connect(fd, addr)
 getsockname(fd) => sockaddr
 getpeername(fd) => sockaddr
 
