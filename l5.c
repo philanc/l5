@@ -397,6 +397,17 @@ static int ll_write(lua_State *L) {
 	RET_INT(n);
 }
 
+static int ll_dup2(lua_State *L) {
+	// lua api: dup2(oldfd, newfd) => newfd | nil, errno
+	int oldfd = luaL_checkinteger(L, 1);
+	int newfd = luaL_checkinteger(L, 2);
+	newfd = dup2(oldfd, newfd);
+	if (newfd == -1) RET_ERRNO;
+	RET_INT(newfd);
+}
+
+
+
 // how to ensure it's enough? --- rewrite with a mb?
 #define IOCTLBUFLEN 1024
 
@@ -645,6 +656,7 @@ static const struct luaL_Reg l5lib[] = {
 	{"read", ll_read},
 	{"read4k", ll_read4k},
 	{"write", ll_write},
+	{"dup2", ll_dup2},
 	//
 	{"ioctl", ll_ioctl},
 	{"poll", ll_poll},

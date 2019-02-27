@@ -54,6 +54,7 @@ read(fd, buf, count) => n
 read4k(fd) => str -- read 4 kbytes
 write(fd, str) => n
 close(fd)
+dup2(oldfd, newfd) => newfd
 
 ioctl(fd, cmd, arg_in) => arg_out
 

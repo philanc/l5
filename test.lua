@@ -162,7 +162,7 @@ function test_fork()
 --~ 		print("  status => exit, sig, coredump =>", exit, sig, core)
 		assert(exit==3 and sig==0 and core==0)
 	end
-	print("test_mode: ok.")
+	print("test_fork: ok.")
 end
 
 ------------------------------------------------------------------------
