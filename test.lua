@@ -55,16 +55,16 @@ function test_stat()
 	-- assume the current dir is "some/path/l5" and contains l5.c
 	os.execute("rm -f l5symlink; ln -s l5.c l5symlink")
 	local lmode, lsize, lmtim, luid, lgid = l5.lstat5("l5symlink")
-	he.printf("mode: %o  size: %d  mtim: %s  uid: %d gid: %d", 
-		lmode, lsize, he.isodate19(lmtim), luid, lgid)
+--~ 	he.printf("  mode: %o  size: %d  mtim: %s  uid: %d gid: %d", 
+--~ 		lmode, lsize, he.isodate19(lmtim), luid, lgid)
 	assert(lsize == 4)
 	assert(lmode & 0xf000 == 0xa000) -- type is symlink
 	assert(lmode & 0xfff == 0x01ff) -- perm is '0777'
 	local target = l5.readlink("l5symlink")
 	assert(target == "l5.c")
 	local mode, size, mtim, uid, gid = l5.lstat5("l5.c")
-	he.printf("mode: %o  size: %d  mtim: %s  uid: %d gid: %d", 
-		mode, size, he.isodate19(mtim), uid, gid)
+--~ 	he.printf("  mode: %o  size: %d  mtim: %s  uid: %d gid: %d", 
+--~ 		mode, size, he.isodate19(mtim), uid, gid)
 	assert(mode & 0xf000 == 0x8000)
 	assert(uid == luid and gid == lgid)
 	t = l5.lstat("l5.c", {})
@@ -135,12 +135,43 @@ function test_mode()
 end
 
 ------------------------------------------------------------------------
+-- test fork and other proc funcs
+
+function test_fork()
+	parpid = l5.getpid()
+	pid = l5.fork()
+	if pid == 0 then
+		print("  child: getpid(), getppid =>", 
+			l5.getpid(), l5.getppid())
+		assert(parpid == l5.getppid())
+		print("  child: exiting with os.exit(3)...")
+		os.exit(3)
+	else
+--~ 		print("  parent pid =>", parpid)
+		print("  parent: fork =>", pid)
+		print("  parent: waiting for child...")
+--~ 		l5.kill(pid, 15)
+		pid, status = l5.wait()
+		print("  parent: wait =>", pid, status)
+		-- exitstatus: (status & 0xff00) >> 8
+		-- termsig: status & 0x7f
+		-- coredump: status & 0x80
+		exit = (status & 0xff00) >> 8
+		sig = status & 0x7f
+		core = status & 0x80
+--~ 		print("  status => exit, sig, coredump =>", exit, sig, core)
+		assert(exit==3 and sig==0 and core==0)
+	end
+	print("test_mode: ok.")
+end
+
+------------------------------------------------------------------------
 
 test_mb()
 test_procinfo()
 test_stat()
 --~ test_mode()
-
+test_fork()
 
 
 ------------------------------------------------------------------------
