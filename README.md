@@ -73,6 +73,14 @@ getnameinfo(sockaddr) => host, port
 
 -- In case of error, most functions return nil, errno.
 
+-- memory block interface (can be used as a byte or int64 array):
+mbnew(size) => mb
+mb:get(idx, len) => str
+mb:set(idx, str)
+mb:geti(idx) => int
+mb:seti(idx, int)
+
+
 ```
 
 
