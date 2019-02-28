@@ -97,14 +97,17 @@ void main() {
 	dispintx(DM_DEV_REMOVE)
 	dispintx(DM_DEV_STATUS)
 	dispintx(DM_TABLE_LOAD)
+	dispintx(DM_TABLE_STATUS)
 	dispintx(DM_LIST_DEVICES)
 	dispsize(struct dm_ioctl)
+	dispsize(struct dm_target_spec)
 	struct dm_ioctl dmi;
 	dispsize(dmi.name)
 	dispsize(dmi.uuid)
 	dispsize(struct dm_target_spec)
 	dispintx(BLKGETSIZE64)
-	
+	dispintx(DM_MAX_TYPE_NAME)
+	dispint((char*)&(dmi.name) - (char*)&dmi)
 	printf("---\n");
 }
 
