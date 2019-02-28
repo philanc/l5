@@ -14,7 +14,10 @@
 #include <dirent.h>	// dir...
 #include <termios.h>	// termios
 #include <sys/ioctl.h>	// TCGETS
+#include <fcntl.h>	// open flags
 #include <poll.h>	// poll
+#include <linux/dm-ioctl.h>	// dm ioctl
+#include <sys/mount.h>	//  BLKGETSIZE64
 
 
 #define dispint(x)	printf(#x "= %d\n", x);
@@ -70,7 +73,38 @@ void main() {
 	// poll
 	dispsize(struct pollfd)
 	
-
+	//open
+	dispintx(O_RDONLY)
+	dispintx(O_WRONLY)
+	dispintx(O_RDWR)
+	dispintx(O_CREAT)
+	dispintx(O_DIRECTORY)
+	dispintx(O_TRUNC)
+	dispintx(O_APPEND)
+	dispintx(O_CLOEXEC)
+	//~ dispintx(O_TMPFILE)	// defined in /asm-generic/fcntl.h
+	dispintx(020000000)	// O_TMPFILE (octal) in musl: 020200000
+	dispintx(020200000)	//  ie O_TMPFILE | O_DIRECTORY  ?!?
+	dispintx(O_EXCL)
+	//~ dispintx()
+	
+	// dm
+	printf("---dm-ioctl\n");
+	dispint(DM_VERSION_MAJOR)
+	dispint(DM_VERSION_MINOR)
+	dispintx(DM_VERSION)
+	dispintx(DM_DEV_CREATE)
+	dispintx(DM_DEV_REMOVE)
+	dispintx(DM_DEV_STATUS)
+	dispintx(DM_TABLE_LOAD)
+	dispintx(DM_LIST_DEVICES)
+	dispsize(struct dm_ioctl)
+	struct dm_ioctl dmi;
+	dispsize(dmi.name)
+	dispsize(dmi.uuid)
+	dispsize(struct dm_target_spec)
+	dispintx(BLKGETSIZE64)
+	
 	printf("---\n");
 }
 

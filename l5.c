@@ -158,6 +158,19 @@ static int ll_mbgeti(lua_State *L) {
 	RET_INT(*(mb + 1 + idx));
 }
 
+// use byte offsets for all mb methods
+//
+// add direct memory access (not mb methods)
+// mget(i [, len]) => str
+// mgetz(i [, maxlen]) => strz
+// mgetp(i) => char *ptr as int64
+//
+// use case: be able to read char **environ
+// build argv, envp in mb
+
+// execve envp: make it default to parent environ
+
+
 //------------------------------------------------------------
 // l5 functions
 
@@ -197,6 +210,13 @@ static int ll_unsetenv(lua_State *L) {
 	int r = unsetenv(luaL_checkstring(L, 1));
 	if (r == -1) RET_ERRNO; else RET_TRUE;
 }
+
+static int ll_environ(lua_State *L) {
+	// lua api: environ() => env_mb
+	
+}
+
+
 
 static int ll_msleep(lua_State *L) {
 	// lua api: msleep(fd, ms)
