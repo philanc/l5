@@ -20,9 +20,9 @@
 #include <sys/mount.h>	//  BLKGETSIZE64
 
 
-#define dispint(x)	printf(#x "= %d\n", x);
-#define dispintx(x)	printf(#x "= 0x%08x\n", x);
-#define dispsize(x)	printf("sizeof " #x "= %d\n", sizeof(x));
+#define dispint(x)	printf(#x " = %d\n", x);
+#define dispintx(x)	printf(#x " = 0x%08x\n", x);
+#define dispsize(x)	printf("sizeof " #x " = %d\n", sizeof(x));
 
 void main() {
 	printf("---\n");
@@ -94,6 +94,7 @@ void main() {
 	dispint(DM_VERSION_MINOR)
 	dispintx(DM_VERSION)
 	dispintx(DM_DEV_CREATE)
+	dispintx(DM_DEV_SUSPEND)
 	dispintx(DM_DEV_REMOVE)
 	dispintx(DM_DEV_STATUS)
 	dispintx(DM_TABLE_LOAD)

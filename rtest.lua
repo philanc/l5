@@ -27,24 +27,25 @@ function blkgetsize(devname)
 	return size
 end
 
-function fill_dmioctl(totsize, dname)
-	-- struct dm_ioctl
-	local DMISIZE = 312
+function fill_dmioctl(totsize, dname, dev, flags)
+	flags = flags or (1<<4)
+	dev = dev or 0
+	local DMISIZE = 312  	-- sizeof(struct dm_ioctl)
 	local s = spack("I4I4I4I4I4I4I4I4I4I4I8z",
 		4, 0, 0,	-- version (must pass it, or ioctl fails)
 		totsize,	-- data_size
 		DMISIZE,	-- data_start
 		1, 0,		-- target_count, open_count
-		16, 		-- flags (1<<4 for dm_table_status)
+		flags, 		-- flags (1<<4 for dm_table_status)
 		0, 0,		-- event_nr, padding
-		0,		-- dev(u64) ???
+		dev,		-- dev(u64)
 		dname		-- device name
 		)
 	s = he.rpad(s, DMISIZE, '\0')
 	return s
 end
 
-function fill_dmtarget()
+function fill_dmtarget(secstart, secnb, targettype, options)
 	-- struct dm_target_spec
 	local DMTSIZE = 40  -- not including option string
 	local len = DMTSIZE + #options + 1
@@ -63,6 +64,36 @@ function dm_opencontrol()
 	local devname = "/dev/mapper/control"
 	local fd, err = l5.open(devname, 0, 0) --O_RDONLY, mode=0
 	return assert2(fd, "open /dev/mapper/control error", err)
+end
+
+function dm_create(cfd, name)
+	local DM_DEV_CREATE = 0xc138fd03
+	local totsize = 512
+	local arg = fill_dmioctl(totsize, name)
+	local s, err = l5.ioctl(cfd, DM_DEV_CREATE, arg, totsize)
+	if not s then return nil, "ioctl dm create error: " .. err end
+	local dev = sunpack("I8", s, 41)
+	return dev
+end
+
+function dm_suspend(cfd, name)
+	DM_DEV_SUSPEND = 0xc138fd06
+	local totsize = 512
+	local arg = fill_dmioctl(totsize, name)
+	local s, err = l5.ioctl(cfd, DM_DEV_SUSPEND, arg, totsize)
+	if not s then return nil, "ioctl dm suspend error: " .. err end
+	local flags = sunpack("I4", s, 29)
+	return flags
+end
+
+function dm_remove(cfd, name, dev)
+	DM_DEV_REMOVE = 0xc138fd04
+	local totsize = 512
+	local arg = fill_dmioctl(totsize, name, dev, 16)
+	local s, err = l5.ioctl(cfd, DM_DEV_REMOVE, arg, totsize)
+	if not s then return nil, "ioctl dm remove error: " .. err end
+	local flags = sunpack("I4", s, 29)
+	return flags
 end
 
 function test_dm0()
@@ -139,12 +170,12 @@ function test_dm3() -- get table status
 	print(name)
 	local fd = dm_opencontrol()
 	local arg = fill_dmioctl(768, name)
+ 	print(he.stohex(arg:sub(1, 312), 16, " "), "\n--")
+
 	local s, err = l5.ioctl(fd, DM_TABLE_STATUS, arg, 768)
 	l5.close(fd)
-	if not s then 
-		print("DM_TABLE_STATUS ioctl error:", err)
-		return
-	end
+	assert2(s, "DM_TABLE_STATUS ioctl error:", err)
+ 	print(he.stohex(s:sub(1, 312), 16, " "))
 	-- for a single target,
 	-- s :: struct dm_ioctl .. struct dm_target_spec .. tbl
 	-- (tbl is here because flags was 1<<4)
@@ -163,13 +194,63 @@ function test_dm3() -- get table status
 	
 end
 
+secsize6 = 40960 -- devloop6
+tbl6 = "aes-xts-plain64 " ..
+	"000102030405060708090a0b0c0d0e0f" ..
+	"101112131415161718191a1b1c1d1e1f" ..
+	" 0 7:6 0"  -- /dev/loop6
+
+function dm_setup_loop6()
+	local name = "loo6"
+	local totsize = 768
+	local cfd = dm_opencontrol()
+	--
+	-- create
+	local dev, err = dm_create(cfd, name)
+	if not dev then print(err); return end
+	pf("dm create dev=%04x", dev)
+	--
+--~ 	print("sleeping.....")
+--~ 	l5.msleep(1000)
+	
+	-- loadmap
+	dev = 0 -- don't pass dev to DM_TABLE_LOAD !!  (or err 6 - ENXIO) 
+	local arg = fill_dmioctl(totsize, name, dev, 16) --flags=0
+	arg = arg .. fill_dmtarget(0, secsize6, "crypt", tbl6)
+	local DM_TABLE_LOAD = 0xc138fd09
+	local s, err = l5.ioctl(cfd, DM_TABLE_LOAD, arg, totsize)
+	if not s then print("dm_table_load error: " .. err); return end
+	--
+	-- suspend
+	flags, err = dm_suspend(cfd, name)
+	if not s then print(err); return end	
+	pf("dm suspend flags=0x%x", flags)
+	print("dm_setup_loop6 done.")
+end
+	
+function dm_remove_loop6()
+	local name = "loo6"
+	local cfd = dm_opencontrol()
+	local flags, err = dm_remove(cfd, name)
+	if not flags then print(err); return end
+	pf("dm remove flags=0x%x", flags)
+	print("dm_remove_loop6 done.")
+	-- returned flags is 0x2000 == 1<<13 -- cf dm-ioctl.h ::
+	-- DM_UEVENT_GENERATED_FLAG "If set, a uevent was generated for 
+	-- which the caller may need to wait." 
+end
+
 
 ------------------------------------------------------------------------
 
 --~ test_dm0()
-test_dm1()
+--~ test_dm1()
 --~ test_dm2()
-test_dm3()
+--~ test_dm3()
+
+--~ dm_setup_loop6()
+dm_remove_loop6()
+
 
 ------------------------------------------------------------------------
 --[[  
