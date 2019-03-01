@@ -173,10 +173,18 @@ function dm_gettable(cfd, name)
 --~ 	print(totsiz, dstart, tcnt, ocnt, flags)
 	local data = s:sub(dstart+1, totsiz) -- struct dm_target_spec
 	local tbl = {}
-	local tnext
-	tbl.secstart, tbl.secnb, tnext, tbl.ttype, tbl.options = 
+	local tnext, ttype
+	tbl.secstart, tbl.secnb, tnext, ttype, tbl.options = 
 		sunpack("I8I8xxxxI4c16z", data)
+	tbl.ttype = sunpack("z", ttype)
 	return tbl
+end
+
+function dm_gettable_str(cfd, name)
+	local tbl, err = dm_gettable(cfd, name)
+	if not tbl then return nil, err end
+	return strf("%d %d %s %s", 
+		tbl.secstart, tbl.secnb, tbl.ttype, tbl.options)
 end
 
 ------------------------------------------------------------------------
@@ -224,6 +232,15 @@ function test_dm3(name) -- get table status
 	print("test_dm3: ok.")
 end
 
+function test_dm3s(name) -- get table status as a string
+	local cfd = dm_opencontrol()
+	local s, err = dm_gettable_str(cfd, name)
+	l5.close(cfd)
+	assert2(s, "dm_table_status ioctl error:", err)
+	print(repr(s))
+	print("test_dm3s: ok.")
+end
+
 secsize6 = 40960 -- devloop6
 opt6 = "aes-xts-plain64 " ..
 	"000102030405060708090a0b0c0d0e0f" ..
@@ -266,11 +283,11 @@ end
 --~ test_dm0()
 --~ test_dm1()
 --~ test_dm2()
---~ test_dm3("lua7")
 
---~ dm_setup_loop6()
---~ test_dm3("loo6")
---~ dm_remove_loop6()
+dm_setup_loop6()
+test_dm3("loo6")
+test_dm3s("loo6")
+dm_remove_loop6()
 
 
 ------------------------------------------------------------------------
