@@ -56,7 +56,7 @@ function blkgetsize(devname)
 	return size
 end
 
-function fill_dmioctl(dname)
+local function fill_dmioctl(dname)
 	local tot
 	local flags = (1<<4)
 	local dev = 0
@@ -74,7 +74,7 @@ function fill_dmioctl(dname)
 	return s
 end
 
-function fill_dmtarget(secstart, secnb, targettype, options)
+local function fill_dmtarget(secstart, secnb, targettype, options)
 	-- struct dm_target_spec
 	local DMTSIZE = 40  -- not including option string
 	local len = DMTSIZE + #options + 1
@@ -212,7 +212,7 @@ end
 	
 function test_dm2() -- list all devices
 	local cfd = dm_opencontrol()
-	dl, err = dm_getdevlist()
+	dl, err = dm_getdevlist(cfd)
 	l5.close(cfd)
 	if not dl then print("test_dm2", err); return end
 	for i, x in ipairs(dl) do
@@ -282,12 +282,12 @@ end
 
 --~ test_dm0()
 --~ test_dm1()
---~ test_dm2()
+test_dm2()
 
-dm_setup_loop6()
-test_dm3("loo6")
-test_dm3s("loo6")
-dm_remove_loop6()
+--~ dm_setup_loop6()
+--~ test_dm3("loo6")
+--~ test_dm3s("loo6")
+--~ dm_remove_loop6()
 
 
 ------------------------------------------------------------------------

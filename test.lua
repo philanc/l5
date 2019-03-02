@@ -151,7 +151,7 @@ function test_fork()
 		print("  parent: fork =>", pid)
 		print("  parent: waiting for child...")
 --~ 		l5.kill(pid, 15)
-		pid, status = l5.wait()
+		pid, status = l5.waitpid()
 		print("  parent: wait =>", pid, status)
 		-- exitstatus: (status & 0xff00) >> 8
 		-- termsig: status & 0x7f
