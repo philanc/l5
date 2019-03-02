@@ -27,6 +27,7 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 #include <netdb.h>	// getaddrinfo
 #include <signal.h>	// kill
 #include <sys/wait.h>	// waitpid 
+#include <sys/mount.h>	// mount umount
 
 
 #include "lua.h"
@@ -419,6 +420,29 @@ static int ll_dup2(lua_State *L) {
 	if (newfd == -1) RET_ERRNO;
 	RET_INT(newfd);
 }
+
+
+static int ll_mount(lua_State *L) {
+	// lua api: mount(src, dest, fstype, flags, data)
+	// src, dest, fstype and data are strings, flags is int.
+	// return true or nil, errno
+	const char *src = luaL_checkstring(L, 1);
+	const char *dest = luaL_checkstring(L, 2);
+	const char *fstype = luaL_checkstring(L, 3);
+	int flags = luaL_checkinteger(L, 4);
+	const char *data = luaL_checkstring(L, 5);
+	int r = mount(src, dest, fstype, flags, data);
+	if (r == -1) RET_ERRNO; else RET_TRUE;
+}
+
+static int ll_umount(lua_State *L) {
+	// lua api: umount(dest) => true | nil, errno
+	// dest is a string
+	const char *dest = luaL_checkstring(L, 1);
+	int r = umount(dest);
+	if (r == -1) RET_ERRNO; else RET_TRUE;
+}
+
 
 // how to ensure it's enough? --- rewrite with a mb?
 #define IOCTLBUFLEN 1024

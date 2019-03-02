@@ -56,6 +56,9 @@ write(fd, str) => n
 close(fd)
 dup2(oldfd [, newfd]) => newfd
 
+mount(src, dest, fstype, flags, data)
+umount(dest)
+
 ioctl(fd, cmd, arg_in) => arg_out
 
 poll(pollset, nfds, timeout) => n
