@@ -59,7 +59,8 @@ dup2(oldfd [, newfd]) => newfd
 mount(src, dest, fstype, flags, data)
 umount(dest)
 
-ioctl(fd, cmd, arg_in) => arg_out
+ioctl(fd, cmd, arg_in, outlen) => out
+ioctl_int(fd, cmd, intarg)
 
 poll(pollset, nfds, timeout) => n
 pollin(fd, timeout) => n -- monitor only one input fd

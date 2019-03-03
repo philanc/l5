@@ -17,6 +17,7 @@
 #include <fcntl.h>	// open flags
 #include <poll.h>	// poll
 #include <linux/dm-ioctl.h>	// dm ioctl
+#include <linux/loop.h>	// loop ioctl
 #include <sys/mount.h>	//  BLKGETSIZE64
 
 
@@ -109,6 +110,17 @@ void main() {
 	dispintx(BLKGETSIZE64)
 	dispintx(DM_MAX_TYPE_NAME)
 	dispint((char*)&(dmi.name) - (char*)&dmi)
+	
+	// loop
+	printf("---linux/loop.h\n");
+	
+	dispsize(struct loop_info64)
+	struct loop_info64 li;
+	dispsize(li.lo_device)
+	dispsize(li.lo_inode)
+	dispint(LO_NAME_SIZE)
+	dispint(LO_KEY_SIZE)
+	
 	printf("---\n");
 }
 

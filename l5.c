@@ -448,20 +448,29 @@ static int ll_umount(lua_State *L) {
 #define IOCTLBUFLEN 1024
 
 static int ll_ioctl(lua_State *L) {
-	// lua api:  ioctl(fd, cmd, pin, poutlen) => r [, pout] | nil, errno
+	// lua api:  ioctl(fd, cmd, arg, argoutlen) => r | argout | nil, errno
 	int fd = luaL_checkinteger(L, 1);
 	int cmd = luaL_checkinteger(L, 2);
-	size_t pinlen = 0;
-	const char *pin = luaL_checklstring(L, 3, &pinlen);
-	size_t poutlen = (size_t) luaL_optinteger(L, 4, 0);
+	size_t arglen = 0;
+	const char *arg = luaL_checklstring(L, 3, &arglen);
+	size_t argoutlen = (size_t) luaL_optinteger(L, 4, 0);
 	char buf[IOCTLBUFLEN]; // how to ensure it's enough?
-	if (pinlen > IOCTLBUFLEN) LERR("ioctl: pin too large");
-	if (poutlen > IOCTLBUFLEN) LERR("ioctl: pout too large");
-	if (pinlen > 0) memcpy(buf, pin, pinlen);
+	if (arglen > IOCTLBUFLEN) LERR("ioctl: arg too large");
+	if (argoutlen > IOCTLBUFLEN) LERR("ioctl: argoutlen too large");
+	if (arglen > 0) memcpy(buf, arg, arglen);
 	int r = ioctl(fd, cmd, buf);
 	if (r == -1) RET_ERRNO; 
-	if (poutlen > 0) { RET_STRN(buf, poutlen); }
+	if (argoutlen > 0) { RET_STRN(buf, argoutlen); }
 	RET_TRUE;
+}
+
+static int ll_ioctl_int(lua_State *L) {
+	// lua api:  ioctl(fd, cmd, intarg) => r | nil, errno
+	int fd = luaL_checkinteger(L, 1);
+	int cmd = luaL_checkinteger(L, 2);
+	long arg = luaL_checkinteger(L, 3);
+	int r = ioctl(fd, cmd, arg);
+	if (r == -1) RET_ERRNO; else RET_INT(r);
 }
 
 static int ll_poll(lua_State *L) {
@@ -695,6 +704,7 @@ static const struct luaL_Reg l5lib[] = {
 	{"dup2", ll_dup2},
 	//
 	{"ioctl", ll_ioctl},
+	{"ioctl_int", ll_ioctl_int},
 	{"poll", ll_poll},
 	{"pollin", ll_pollin},
 	//

@@ -188,10 +188,83 @@ function dm_gettable_str(cfd, name)
 end
 
 ------------------------------------------------------------------------
+-- loop functions
+
+-- see linux/loop.h
+
+loop = {}
+
+loop.INFO64_SIZE = 232
+loop.NAME_SIZE = 64
+
+function loop.getfile(devname)
+	local LOOP_GET_STATUS64	= 0x4C05
+	local fd, err, s, fname
+	fd, err = l5.open(devname, 0, 0)
+	if not fd then return nil, "open error: " .. err end
+	s, err = l5.ioctl(fd, LOOP_GET_STATUS64, "", loop.INFO64_SIZE)
+	l5.close(fd)
+	if not s then return nil, "getfile error: " .. err end
+--~ 	px(s)
+--~ 	dev, ino, _, _, _, loopno = sunpack("I8I8I8I8I8I4", s)
+--~ 	pf("dev: %x  ino: %d  loopno: %d", dev, ino, loopno)
+	_, fname = sunpack("c56z", s)
+	return fname
+end
+
+function loop.clear(devname)
+	local LOOP_CLR_FD = 0x4C01
+	local fd, err, s
+	fd, err = l5.open(devname, 0, 0)
+	if not fd then return nil, "open error: " .. err end
+	s, err = l5.ioctl(fd, LOOP_CLR_FD, "", loop.INFO64_SIZE)
+	l5.close(fd)
+	if not s then return nil, "clear error: " .. err end
+	return true
+end
+
+function loop.set(devname, filename, ro_flag)
+	-- default flags is O_RDWR(2)
+	local flags = ro_flag and 0 or 2  -- 0=O_RDONLY, 2=O_RDWR
+	local LOOP_SET_FD = 0x4C00
+	local LOOP_SET_STATUS64	= 0x4C04
+	local dfd, ffd, err, arg, s
+	ffd, err = l5.open(filename, flags, 0)
+	if not ffd then return nil, "file open error: " .. err end
+	dfd, err = l5.open(devname, 0, 0)
+	if not dfd then 
+		l5.close(ffd)
+		return nil, "dev open error: " .. err 
+	end
+--~ 	print('ffd',ffd, 'dfd', dfd)
+	-- LOOP_SET_FD ioctl: ffd is passed _directly_, not via a pointer
+	s, err = l5.ioctl_int(dfd, LOOP_SET_FD, ffd) 
+	if not s then 
+		err = "LOOP_SET_FD error: " .. err
+		goto ret 
+	end
+	arg = rpad(('\0'):rep(56) .. filename, loop.INFO64_SIZE, '\0')
+	s, err = l5.ioctl(dfd, LOOP_SET_STATUS64, arg, loop.INFO64_SIZE)
+	if not s then 
+		err = "LOOP_SET_STATUS64 error: " .. err
+		goto ret 
+	end
+	
+	::ret::
+	l5.close(dfd)
+	l5.close(ffd)
+	if err then return nil, err end
+	return true
+end
+	
+
+
+------------------------------------------------------------------------
 -- tests
 
-
-
+-- assume loop6 is available and setup on a dummy file
+--	dd if=/dev/zero of=some_file bs=1M count=20
+--	losetup /dev/loop6 some_file
 
 function test_dm0()
 	local dn = "/dev/loop6"
@@ -277,18 +350,48 @@ function dm_remove_loop6()
 	-- which the caller may need to wait." 
 end
 
+function test_loop1()
+	devname = "/dev/loop6"
+	filename = "/f/rtmp/l5/mb20"
+	r, err = loop.set(devname, filename)
+	print(devname, filename, r, err)
+	print("test_loop1 done.")
+end
 
+function test_loop2()
+	local devname, fname, err 
+	devname = "/dev/loop6"
+	fname, err = loop.getfile(devname)
+	pf("%s :: %s (%s)", devname, repr(fname), err or "no error")
+	devname = "/dev/loop7"
+	fname, err = loop.getfile(devname)
+	pf("%s :: %s (%s)", devname, repr(fname), err or "no error")
+	print("test_loop2 done.")
+end
+
+function test_loop3()
+	local devname, s, err 
+	devname = "/dev/loop6"
+	s, err = loop.clear(devname)
+	print(devname, "cleared", s, err)
+	print("test_loop3 done.")
+end
 ------------------------------------------------------------------------
 
 --~ test_dm0()
 --~ test_dm1()
-test_dm2()
+--~ test_dm2()
 
 --~ dm_setup_loop6()
 --~ test_dm3("loo6")
 --~ test_dm3s("loo6")
 --~ dm_remove_loop6()
 
+test_loop1()
+test_loop2()
+test_loop3()
+l5.msleep(10) --else, next shows the (former) assoc file for loop6... why?
+test_loop2()
 
 ------------------------------------------------------------------------
 --[[  
