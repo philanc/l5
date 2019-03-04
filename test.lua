@@ -51,6 +51,17 @@ end
 ------------------------------------------------------------------------
 -- test (l)stat
 
+-- file types:  use mode & S_IFMT
+S_IFMT = 0x0000f000
+S_IFSOCK = 0x0000c000
+S_IFLNK = 0x0000a000
+S_IFREG = 0x00008000
+S_IFBLK = 0x00006000
+S_IFDIR = 0x00004000
+S_IFCHR = 0x00002000
+S_IFIFO = 0x00001000
+
+
 function test_stat()
 	-- assume the current dir is "some/path/l5" and contains l5.c
 	os.execute("rm -f l5symlink; ln -s l5.c l5symlink")
@@ -70,7 +81,17 @@ function test_stat()
 	t = l5.lstat("l5.c", {})
 	assert(t[3]==mode and t[5]==uid and t[6]==gid and t[8]==size
 		and t[12]==mtim)
-
+	-- test mkdir
+	local r, eno, em
+	local dn = "/tmp/l5td"
+	r, eno = l5.mkdir(dn)
+	mode, size, mtim, uid, gid = l5.lstat5(dn)
+	assert(mode & S_IFMT == S_IFDIR)
+	r, eno = l5.rmdir(dn)
+	assert(r)
+	mode, size, mtim, uid, gid = l5.lstat5(dn)
+--~ 	print('dir', mode, size)
+	assert((not mode) and size==2) -- here size == errno == ENOENT
 	print("test_stat: ok.")
 end
 

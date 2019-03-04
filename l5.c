@@ -233,16 +233,22 @@ static int ll_fork(lua_State *L) {
 	RET_INT(pid);
 }
 
-static int ll_wait(lua_State *L) {
-	// wait for state changes in a child process (wait(2))
-	// lua api: wait() => pid, status | nil, errno
-	// pid and status are integers
+static int ll_waitpid(lua_State *L) {
+	// wait for state changes in a child process (waitpid(2))
+	// lua api: waitpid(pid, opt) => pid, status | nil, errno
+	// pid, opt and status are integers
 	// (for status consts and macros, see sys/wait.h)
 	//	exitstatus: (status & 0xff00) >> 8
 	//	termsig: status & 0x7f
 	//	coredump: status & 0x80
+	// pid default value is -1 (wait for any child - same as wait())
+	// pid=0: wait for any child in same process group
+	// pid=123: wait for child with pid 123
+	// opt=1 (WNOHANG) => return immediately if no child has exited.
 	int status = 0;
-	int pid = wait(&status);
+	int pid = luaL_optinteger(L, 1, -1);
+	int opt = luaL_optinteger(L, 2, 0);
+	pid = waitpid(pid, &status, opt);
 	if (pid == -1) RET_ERRNO; 
 	lua_pushinteger(L, pid);
 	lua_pushinteger(L, status);
@@ -698,7 +704,7 @@ static const struct luaL_Reg l5lib[] = {
 	//
 	{"msleep", ll_msleep},
 	{"fork", ll_fork},
-	{"wait", ll_wait},
+	{"waitpid", ll_waitpid},
 	{"kill", ll_kill},
 	{"execve", ll_execve},
 	//

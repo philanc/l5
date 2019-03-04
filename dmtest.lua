@@ -70,6 +70,7 @@ function blkgetsize(devname)
 	if not fd then return nil, errm(eno, "open") end
 	local BLKGETSIZE64 = 0x80081272
 	local s, eno = l5.ioctl(fd, BLKGETSIZE64, "", 8)
+	l5.close(fd)
 	if not s then return nil, errm(eno, "ioctl") end
 	local size = ("T"):unpack(s)
 	return size
@@ -491,6 +492,7 @@ l5.msleep(100)
 test_mount()
 
 test_dm_remove()
+
 test_loop_status() -- loop6 is still setup
 test_loop_remove()
 --need some delay here. 

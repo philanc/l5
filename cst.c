@@ -47,6 +47,14 @@ void main() {
 	dispsize(time_t)
 	dispsize(struct timespec)
 	dispsize(struct stat)
+	dispintx(S_IFMT)  // mask for file type in mode
+	dispintx(S_IFSOCK)
+	dispintx(S_IFLNK)
+	dispintx(S_IFREG)
+	dispintx(S_IFBLK)
+	dispintx(S_IFDIR)
+	dispintx(S_IFCHR)
+	dispintx(S_IFIFO)
 
 	// path, dirs
 	dispint(PATH_MAX)
