@@ -3,7 +3,13 @@
 
 -- dmtest.lua
 
--------------------------------------------------------------------------- local definitions
+
+-- conventions
+--	em:  error message (a string)
+--	eno: errno value (an integer)
+
+------------------------------------------------------------------------
+-- local definitions and utilities
 
 local l5 = require "l5"
 
@@ -25,14 +31,27 @@ end
 
 local function repr(x) return string.format('%q', x) end
 
-function rpad(s, w, ch) 
+local function rpad(s, w, ch) 
 	-- pad s to the right to width w with char ch
 	return (#s < w) and s .. ch:rep(w - #s) or s
 end
 
-local function assert2(r, m1, m2)
-	if not r then error(tostring(m1) .. ": " .. tostring(m2)) end
-	return r
+local function errm(eno, txt)
+	-- errm(17, "open") => "open error: 17"
+	-- errm(17)         => "error: 17"
+	local s = "error: " .. tostring(eno)
+	return txt and (txt .. " " .. s) or s
+end
+	
+local function fget(fname)
+	-- return content of file 'fname' or nil, msg in case of error
+	local f, msg, s
+	f, msg = io.open(fname, 'rb')
+	if not f then return nil, msg end
+	s, msg = f:read("*a")
+	f:close()
+	if not s then return nil, msg end
+	return s
 end
 
 ------------------------------------------------------------------------
@@ -47,11 +66,11 @@ local DMISIZE = 312  	-- sizeof(struct dm_ioctl)
 
 function blkgetsize(devname)
 	-- return the byte size of a block device
-	fd, err = l5.open(devname, 0, 0) --O_RDONLY, mode=0
-	if not fd then return nil, "open error: " .. err end
+	fd, eno = l5.open(devname, 0, 0) --O_RDONLY, mode=0
+	if not fd then return nil, errm(eno, "open") end
 	local BLKGETSIZE64 = 0x80081272
-	local s, err = l5.ioctl(fd, BLKGETSIZE64, "", 8)
-	if not s then return nil, "ioctl error: " .. err end
+	local s, eno = l5.ioctl(fd, BLKGETSIZE64, "", 8)
+	if not s then return nil, errm(eno, "ioctl") end
 	local size = ("T"):unpack(s)
 	return size
 end
@@ -89,27 +108,27 @@ local function fill_dmtarget(secstart, secnb, targettype, options)
 	return s
 end
 
-function dm_opencontrol()
-	local fd, err = l5.open("/dev/mapper/control", 0, 0) 
+local function dm_opencontrol()
+	local fd, eno = l5.open("/dev/mapper/control", 0, 0) 
 		--O_RDONLY, mode=0
-	return assert2(fd, "open /dev/mapper/control error", err)
+	return assert(fd, errm(eno, "open /dev/mapper/control"))
 end
 
-function dm_getversion(cfd)
+local function dm_getversion(cfd)
 	local DM_VERSION= 0xc138fd00
 	local arg = fill_dmioctl("")
-	local s, err = l5.ioctl(cfd, DM_VERSION, arg, argsize)
-	assert2(s, "ioctl error", err)
+	local s, eno = l5.ioctl(cfd, DM_VERSION, arg, argsize)
+	assert(s, errm(eno, "dm_version ioctl"))
 --~ 	px(s)
 	local major, minor, patch = ("I4I4I4"):unpack(s)
 	return major, minor, patch
 end
 
-function dm_getdevlist(cfd)
+local function dm_getdevlist(cfd)
 	local DM_LIST_DEVICES= 0xc138fd02
 	local arg = fill_dmioctl("")
-	local s, err = l5.ioctl(cfd, DM_LIST_DEVICES, arg, argsize)
-	if not s then return nil, "ioctl error: " .. err end
+	local s, eno = l5.ioctl(cfd, DM_LIST_DEVICES, arg, argsize)
+	if not s then return nil, errm(eno, "ioctl")  end
 	-- devlist is after the dm_ioctl struct
 	local data = s:sub(DMISIZE + 1)
 	local i, devlist = 1, {}
@@ -123,48 +142,48 @@ function dm_getdevlist(cfd)
 	return devlist
 end
 
-function dm_create(cfd, name)
+local function dm_create(cfd, name)
 	local DM_DEV_CREATE = 0xc138fd03
 	local arg = fill_dmioctl(name)
-	local s, err = l5.ioctl(cfd, DM_DEV_CREATE, arg, argsize)
-	if not s then return nil, "ioctl dm create error: " .. err end
+	local s, eno = l5.ioctl(cfd, DM_DEV_CREATE, arg, argsize)
+	if not s then return nil, errm(eno, "ioctl dm_dev_create") end
 	local dev = sunpack("I8", s, 41)
 	return dev
 end
 
-function dm_tableload(cfd, name, secstart, secsize, ttype, options)
+local function dm_tableload(cfd, name, secstart, secsize, ttype, options)
 	local DM_TABLE_LOAD = 0xc138fd09
 	local arg = fill_dmioctl(name)
 	arg = arg .. fill_dmtarget(secstart, secsize, ttype, options)
-	local s, err = l5.ioctl(cfd, DM_TABLE_LOAD, arg, argsize)
-	if not s then print("dm_table_load error: " .. err); return end
+	local s, eno = l5.ioctl(cfd, DM_TABLE_LOAD, arg, argsize)
+	if not s then return nil, errm(eno, "ioctl dm_table_load") end
 	return true
 end	
 
-function dm_suspend(cfd, name)
+local function dm_suspend(cfd, name)
 	DM_DEV_SUSPEND = 0xc138fd06
 	local arg = fill_dmioctl(name)
-	local s, err = l5.ioctl(cfd, DM_DEV_SUSPEND, arg, argsize)
-	if not s then return nil, "ioctl dm suspend error: " .. err end
+	local s, eno = l5.ioctl(cfd, DM_DEV_SUSPEND, arg, argsize)
+	if not s then return nil, errm(eno, "ioctl dm_dev_suspend") end
 	local flags = sunpack("I4", s, 29)
 	return flags
 end
 
-function dm_remove(cfd, name)
+local function dm_remove(cfd, name)
 	DM_DEV_REMOVE = 0xc138fd04
 	local arg = fill_dmioctl(name)
-	local s, err = l5.ioctl(cfd, DM_DEV_REMOVE, arg, argsize)
-	if not s then return nil, "ioctl dm remove error: " .. err end
+	local s, eno = l5.ioctl(cfd, DM_DEV_REMOVE, arg, argsize)
+	if not s then return nil, errm(eno, "ioctl dm_dev_remove") end
 	local flags = sunpack("I4", s, 29)
 	return flags
 end
 
-function dm_gettable(cfd, name)
+local function dm_gettable(cfd, name)
 	-- get _one_ table. (ok for basic dmcrypt)
 	local DM_TABLE_STATUS = 0xc138fd0c
 	local arg = fill_dmioctl(name)
-	local s, err = l5.ioctl(cfd, DM_TABLE_STATUS, arg, argsize)
-	if not s then return nil, "ioctl dm table_status error: " .. err end
+	local s, eno = l5.ioctl(cfd, DM_TABLE_STATUS, arg, argsize)
+	if not s then return nil, errm(eno, "ioctl dm_table_status") end
 	-- for a single target,
 	-- s :: struct dm_ioctl .. struct dm_target_spec .. options
 	-- (tbl is here because flags was 1<<4)
@@ -180,12 +199,41 @@ function dm_gettable(cfd, name)
 	return tbl
 end
 
-function dm_gettable_str(cfd, name)
-	local tbl, err = dm_gettable(cfd, name)
-	if not tbl then return nil, err end
+local function dm_gettable_str(cfd, name)
+	local tbl, em = dm_gettable(cfd, name)
+	if not tbl then return nil, em end
 	return strf("%d %d %s %s", 
 		tbl.secstart, tbl.secnb, tbl.ttype, tbl.options)
 end
+
+
+local dm = {}
+
+function dm.setup(dname, tblstr)
+	local pat = "^(%d+) (%d+) (%S+) (.+)$"
+	local start, siz, typ, opt = tblstr:match(pat)
+	local cfd = dm_opencontrol()
+	local r, em = dm_create(cfd, dname)
+	if not r then goto close end
+	r, em = dm_tableload(cfd, dname, start, siz, typ, opt)
+	if not r then goto close end
+	r, em = dm_suspend(cfd, dname)
+	::close::
+	l5.close(cfd)
+	if em then return nil, em else return true end
+end
+
+function dm.remove(dname)
+	local cfd = dm_opencontrol()
+	return dm_remove(cfd, dname)
+end
+
+function dm.gettable(dname)
+	local cfd = dm_opencontrol()
+	return dm_gettable_str(cfd, dname)
+end
+
+
 
 ------------------------------------------------------------------------
 -- loop functions
@@ -197,14 +245,14 @@ loop = {}
 loop.INFO64_SIZE = 232
 loop.NAME_SIZE = 64
 
-function loop.getfile(devname)
+function loop.status(devname)
 	local LOOP_GET_STATUS64	= 0x4C05
-	local fd, err, s, fname
-	fd, err = l5.open(devname, 0, 0)
-	if not fd then return nil, "open error: " .. err end
-	s, err = l5.ioctl(fd, LOOP_GET_STATUS64, "", loop.INFO64_SIZE)
+	local fd, eno, s, fname
+	fd, eno = l5.open(devname, 0, 0)
+	if not fd then return nil, errm(eno, "open") end
+	s, eno = l5.ioctl(fd, LOOP_GET_STATUS64, "", loop.INFO64_SIZE)
 	l5.close(fd)
-	if not s then return nil, "getfile error: " .. err end
+	if not s then return nil, errm(eno, "loop status") end
 --~ 	px(s)
 --~ 	dev, ino, _, _, _, loopno = sunpack("I8I8I8I8I8I4", s)
 --~ 	pf("dev: %x  ino: %d  loopno: %d", dev, ino, loopno)
@@ -212,48 +260,48 @@ function loop.getfile(devname)
 	return fname
 end
 
-function loop.clear(devname)
+function loop.remove(devname)
 	local LOOP_CLR_FD = 0x4C01
-	local fd, err, s
-	fd, err = l5.open(devname, 0, 0)
-	if not fd then return nil, "open error: " .. err end
-	s, err = l5.ioctl(fd, LOOP_CLR_FD, "", loop.INFO64_SIZE)
+	local fd, eno, s
+	fd, eno = l5.open(devname, 0, 0)
+	if not fd then return nil, errm(eno, "open") end
+	s, eno = l5.ioctl(fd, LOOP_CLR_FD, "", loop.INFO64_SIZE)
 	l5.close(fd)
-	if not s then return nil, "clear error: " .. err end
+	if not s then return nil, errm(eno, "loop remove") end
 	return true
 end
 
-function loop.set(devname, filename, ro_flag)
+function loop.setup(devname, filename, ro_flag)
 	-- default flags is O_RDWR(2)
 	local flags = ro_flag and 0 or 2  -- 0=O_RDONLY, 2=O_RDWR
 	local LOOP_SET_FD = 0x4C00
 	local LOOP_SET_STATUS64	= 0x4C04
-	local dfd, ffd, err, arg, s
-	ffd, err = l5.open(filename, flags, 0)
-	if not ffd then return nil, "file open error: " .. err end
-	dfd, err = l5.open(devname, 0, 0)
+	local dfd, ffd, eno, em, arg, s
+	ffd, eno = l5.open(filename, flags, 0)
+	if not ffd then return nil, errm(eno, "loop setup file open") end
+	dfd, eno = l5.open(devname, 0, 0)
 	if not dfd then 
 		l5.close(ffd)
-		return nil, "dev open error: " .. err 
+		return nil, errm("loop setup dev open") 
 	end
 --~ 	print('ffd',ffd, 'dfd', dfd)
 	-- LOOP_SET_FD ioctl: ffd is passed _directly_, not via a pointer
-	s, err = l5.ioctl_int(dfd, LOOP_SET_FD, ffd) 
+	s, eno = l5.ioctl_int(dfd, LOOP_SET_FD, ffd) 
 	if not s then 
-		err = "LOOP_SET_FD error: " .. err
+		em = errm(eno, "loop_set_fd")
 		goto ret 
 	end
 	arg = rpad(('\0'):rep(56) .. filename, loop.INFO64_SIZE, '\0')
-	s, err = l5.ioctl(dfd, LOOP_SET_STATUS64, arg, loop.INFO64_SIZE)
+	s, eno = l5.ioctl(dfd, LOOP_SET_STATUS64, arg, loop.INFO64_SIZE)
 	if not s then 
-		err = "LOOP_SET_STATUS64 error: " .. err
+		em = errm(eno, "loop_set_status64")
 		goto ret 
 	end
 	
 	::ret::
 	l5.close(dfd)
 	l5.close(ffd)
-	if err then return nil, err end
+	if err then return nil, em end
 	return true
 end
 	
@@ -266,24 +314,34 @@ end
 --	dd if=/dev/zero of=some_file bs=1M count=20
 --	losetup /dev/loop6 some_file
 
-function test_dm0()
+secsize6 = 40960 -- devloop6
+opt6 = "aes-xts-plain64 " ..
+	"000102030405060708090a0b0c0d0e0f" ..
+	"101112131415161718191a1b1c1d1e1f" ..
+--~ 	" 0 7:6 0"   /dev/loop6
+	" 0 /dev/loop6 0"  -- work as an input to dm.setup()
+ts6 = "0 40960 crypt " .. opt6
+	
+	
+
+function test_blkgetsize()
 	local dn = "/dev/loop6"
-	local size, errm = blkgetsize(dn)
-	if not size then print("test_dm0", dn, errm); return end
+	local size, em = blkgetsize(dn)
+	if not size then print("test_dm0", dn, em); return end
 	print("size, nb 512-byte sectors:", dn, size, size // 512)
-	print("test_dm0: ok.")
+	print("test_blkgetsize: ok.")
 end
 
 
-function test_dm1() -- get version
+function test_dm_version() -- get version
 	local cfd = dm_opencontrol()
-	print("major, minor, patch", dm_getversion(cfd))
+	print("dm version - major, minor, patch:", dm_getversion(cfd))
 	l5.close(cfd)
-	print("test_dm1: ok.")
+	print("test_dm_version: ok.")
 end
 	
 	
-function test_dm2() -- list all devices
+function test_dm_devlist() -- list all devices
 	local cfd = dm_opencontrol()
 	dl, err = dm_getdevlist(cfd)
 	l5.close(cfd)
@@ -292,112 +350,176 @@ function test_dm2() -- list all devices
 		pf("dev: %x (%d:%d)  name: %s", 
 			x.dev, x.dev>>8, x.dev&0xff, x.name)
 	end
-	print("test_dm2: ok.")
+	print("test_dm_devlist: ok.")
 end
 
-function test_dm3(name) -- get table status
-	local cfd = dm_opencontrol()
-	local tbl, err = dm_gettable(cfd, name)
-	l5.close(cfd)
-	assert2(tbl, "dm_table_status ioctl error:", err)
-	pf("secstart: %d  secnb: %d  target type: %s \noptions: %s", 
-		tbl.secstart, tbl.secnb, tbl.ttype, tbl.options)
-	print("test_dm3: ok.")
-end
 
-function test_dm3s(name) -- get table status as a string
-	local cfd = dm_opencontrol()
-	local s, err = dm_gettable_str(cfd, name)
-	l5.close(cfd)
-	assert2(s, "dm_table_status ioctl error:", err)
-	print(repr(s))
-	print("test_dm3s: ok.")
-end
 
-secsize6 = 40960 -- devloop6
-opt6 = "aes-xts-plain64 " ..
-	"000102030405060708090a0b0c0d0e0f" ..
-	"101112131415161718191a1b1c1d1e1f" ..
---~ 	" 0 7:6 0"  -- /dev/loop6
-	" 0 /dev/loop6 0"  -- /dev/loop6
-
-function dm_setup_loop6()
-	local name = "loo6"
-	local totsize = 768
-	local cfd = dm_opencontrol()
-	--
-	-- create
-	local r, err = dm_create(cfd, name)
-	if not r then print(err); return end
---~ 	pf("dm create dev=%04x", r)
-	r, err = dm_tableload(cfd, name, 0, secsize6, "crypt", opt6)
-	if not r then print(err); return end
-	r, err = dm_suspend(cfd, name)
-	if not r then print(err); return end	
---~ 	pf("dm suspend flags=0x%x", r)
-	print("dm_setup_loop6 done.")
-end
-	
-function dm_remove_loop6()
-	local name = "loo6"
-	local cfd = dm_opencontrol()
-	local flags, err = dm_remove(cfd, name)
-	if not flags then print(err); return end
-	pf("dm remove flags=0x%x", flags)
-	print("dm_remove_loop6 done.")
-	-- returned flags is 0x2000 == 1<<13 -- cf dm-ioctl.h ::
-	-- DM_UEVENT_GENERATED_FLAG "If set, a uevent was generated for 
-	-- which the caller may need to wait." 
-end
-
-function test_loop1()
+function test_loop_setup()
 	devname = "/dev/loop6"
 	filename = "/f/rtmp/l5/mb20"
-	r, err = loop.set(devname, filename)
-	print(devname, filename, r, err)
-	print("test_loop1 done.")
+	r, em = loop.setup(devname, filename)
+	print(devname, filename, r, em)
+	print("test_loop_setup done.")
+	return r, em
 end
 
-function test_loop2()
-	local devname, fname, err 
+function test_loop_status()
+	local devname, fname, em
 	devname = "/dev/loop6"
-	fname, err = loop.getfile(devname)
-	pf("%s :: %s (%s)", devname, repr(fname), err or "no error")
+	fname, em = loop.status(devname)
+	if not fname then
+		print(devname, em)
+		return nil, em
+	end
+	pf("%s setup on file %s", devname, fname)
+	print("test_loop_status done.")
+	return true
+end
+
+function test_loop_status7()
+	local devname, fname, em
 	devname = "/dev/loop7"
-	fname, err = loop.getfile(devname)
-	pf("%s :: %s (%s)", devname, repr(fname), err or "no error")
-	print("test_loop2 done.")
+	fname, em = loop.status(devname)
+	if not fname then
+		print(devname, em)
+		return nil, em
+	end
+	pf("%s setup on file %s", devname, fname)
+	print("test_loop_status done.")
+	return true
 end
 
-function test_loop3()
-	local devname, s, err 
+function test_loop_remove()
+	local devname, s, em
 	devname = "/dev/loop6"
-	s, err = loop.clear(devname)
-	print(devname, "cleared", s, err)
-	print("test_loop3 done.")
+	s, em = loop.remove(devname)
+	if not s then 
+		print(em)
+		return nil, em
+	else
+		pf("%s loop removed.", devname)
+	end
+	print("test_loop_remove done.")
+	return true
 end
+
+function test_dm_setup()
+	local name = "loo6"
+	r, em = dm.setup("loo6", ts6)
+	if not r then
+		print("test_dm_setup", em)
+		return nil, em
+	end
+	print("test_dm_setup done.")
+	return true
+end
+
+function test_dm_gettable()
+	local name = "loo6"
+	r, em = dm.gettable("loo6")
+	if not r then
+		print("test_dm_gettable", em)
+		return nil, em
+	else
+		print("loo6 table:", r)
+	end
+	print("test_dm_gettable done.")
+	return true
+end
+
+function test_dm_remove()
+	local name = "loo6"
+	r, em = dm.remove("loo6")
+	if not r then
+		print("test_dm_remove", em)
+		return nil, em
+	end
+	print("test_dm_remove done.")
+	return true
+end
+
+
+
+function test_mount()
+	-- mount the filesystem, read a file, and umount it.
+	--
+--~ 	os.execute("ls -l /dev/mapper")
+	local mpt = "/tmp/m6"
+	local r, eno = l5.mount("/dev/mapper/loo6", mpt, "ext4", 0, "")
+	if not r then
+		print(errm(eno, "mount"))
+		return nil, eno
+	end
+--~ 	os.execute("ls -l " .. mpt)
+--~ 	print("cwd:", l5.getcwd())
+	s = fget(mpt .. "/hello")
+	print("content:", s)
+--~ 	assert(s == "hello!!!\n")
+	r, eno = l5.umount(mpt)
+	if not r then
+		print(errm(eno, "umount"))
+		return nil, eno
+	end
+	return true
+end
+	
+	
 ------------------------------------------------------------------------
 
---~ test_dm0()
---~ test_dm1()
---~ test_dm2()
+test_dm_version()
+--
+assert(test_loop_setup())
+test_blkgetsize()
+--
+assert(test_dm_setup())
+test_dm_devlist()
+test_dm_gettable()
 
---~ dm_setup_loop6()
---~ test_dm3("loo6")
---~ test_dm3s("loo6")
---~ dm_remove_loop6()
+-- First time the loop and dm setup are performed,
+-- the encrypted disk must be formatted and some content 
+-- written to it for test_mount():
+--	mkfs.ext4 /dev/mapper/loo6
+--	mkdir -p /tmp/m6
+--	mount /dev/mapper/loo6 /tmp/m6
+--	echo "hello!!!" > /tmp/m6/hello
+--	sync; umount /tmp/m6
 
-test_loop1()
-test_loop2()
-test_loop3()
-l5.msleep(10) --else, next shows the (former) assoc file for loop6... why?
-test_loop2()
+-- need some delay here. else mount fails (ENOENT)
+-- why?  some udev issue?
+l5.msleep(100) 
+test_mount()
+
+test_dm_remove()
+test_loop_status() -- loop6 is still setup
+test_loop_remove()
+--need some delay here. 
+-- else, status() shows the former assoc file for loop6... 
+-- why?  some udev issue?
+
+l5.msleep(200) 
+test_loop_status() -- loop6 is gone
+--~ test_loop_status7() 
+--~ os.execute("echo 'losetup -a' ; losetup -a")
 
 ------------------------------------------------------------------------
 --[[  
 
 TEMP NOTES  
 
+--
+
+in dm table, device can be passed as "major:minor" or "/dev/devname"
+eg. 7:6 or /dev/loop6.  The table returned by dm.status always use "7:6".
+
+--
+
+test returned flags for 0x2000 == 1<<13 -- cf dm-ioctl.h ::
+DM_UEVENT_GENERATED_FLAG "If set, a uevent was generated for 
+which the caller may need to wait." 
+-does it work without udev?
+
+--
 
 ]]
 

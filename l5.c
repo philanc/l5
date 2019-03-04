@@ -351,6 +351,20 @@ static int ll_lstat(lua_State *L) {
 	return 1;
 }
 
+static int ll_mkdir(lua_State *L) {
+	const char *pname = luaL_checkstring(L, 1);
+	int mode = luaL_optinteger(L, 2, 0);
+	int n = mkdir(pname, mode);
+	if (n == -1) RET_ERRNO; else RET_TRUE;	
+}
+
+static int ll_rmdir(lua_State *L) { 
+	const char *pname = luaL_checkstring(L, 1);
+	int n = rmdir(pname);
+	if (n == -1) RET_ERRNO; else RET_TRUE;
+}
+
+
 //----------------------------------------------------------------------
 // basic I/O
 
@@ -420,7 +434,6 @@ static int ll_dup2(lua_State *L) {
 	if (newfd == -1) RET_ERRNO;
 	RET_INT(newfd);
 }
-
 
 static int ll_mount(lua_State *L) {
 	// lua api: mount(src, dest, fstype, flags, data)
@@ -695,6 +708,8 @@ static const struct luaL_Reg l5lib[] = {
 	{"readlink", ll_readlink},
 	{"lstat5", ll_lstat5},
 	{"lstat", ll_lstat},
+	{"mkdir", ll_mkdir},
+	{"rmdir", ll_rmdir},
 	//
 	{"open", ll_open},
 	{"close", ll_close},
@@ -702,6 +717,8 @@ static const struct luaL_Reg l5lib[] = {
 	{"read4k", ll_read4k},
 	{"write", ll_write},
 	{"dup2", ll_dup2},
+	{"mount", ll_mount},
+	{"umount", ll_umount},
 	//
 	{"ioctl", ll_ioctl},
 	{"ioctl_int", ll_ioctl_int},
