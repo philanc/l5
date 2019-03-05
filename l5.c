@@ -275,6 +275,7 @@ static int ll_execve(lua_State *L) {
 }
 
 static int ll_opendir(lua_State *L) {
+	// lua api: opendir(pathname) => dirhandle (lightuserdata)
 	DIR *dp = opendir(luaL_checkstring(L, 1));
 	if (dp == NULL) RET_ERRNO;
 	lua_pushlightuserdata(L, dp);
@@ -282,6 +283,8 @@ static int ll_opendir(lua_State *L) {
 }
 
 static int ll_readdir(lua_State *L) {
+	// lua api: readdir(dh) => filename, filetype | nil, errno
+	// at end of dir, return nil, 0
 	DIR *dp = lua_touserdata(L, 1);
 	errno = 0;
 	struct dirent *p = readdir(dp);
@@ -294,6 +297,7 @@ static int ll_readdir(lua_State *L) {
 }
 
 static int ll_closedir(lua_State *L) {
+	// lua api: closedir(dh)
 	DIR *dp = lua_touserdata(L, 1);
 	int r = closedir(dp);
 	if (r == -1) RET_ERRNO; else RET_TRUE;

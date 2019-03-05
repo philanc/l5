@@ -29,6 +29,8 @@ end
 function util.errm(eno, txt)
 	-- errm(17, "open") => "open error: 17"
 	-- errm(17)         => "error: 17"
+	-- errm(0, "xyz")   => nil
+	if eno == 0 then return end
 	local s = "error: " .. tostring(eno)
 	return txt and (txt .. " " .. s) or s
 end

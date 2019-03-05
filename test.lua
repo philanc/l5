@@ -8,6 +8,7 @@ l5 = require "l5"
 
 util = require "l5.util"
 tty = require "l5.tty"
+fs = require "l5.fs"
 
 local spack, sunpack = string.pack, string.unpack
 
@@ -188,12 +189,38 @@ function test_fork()
 end
 
 ------------------------------------------------------------------------
+-- test filesystem functions
+
+
+function test_fs()
+	local dl, em = fs.dir1("/")
+	assert(dl, em)
+	local found = false
+	for i, e in ipairs(dl) do
+--~ 		print(e[2], e[1]) -- ftype, fname
+		found = found or (e[1] == "bin" and e[2] == "dir")
+	end
+	assert(found, "/bin not found")
+	dl, em = fs.ls3("/dev/mapper")
+	found = false
+	for i, e in ipairs(dl) do
+--~ 		print(e[2], e[1], e[3], e[4]) -- ftype, fname, mtime, size
+		found = found or 
+			(e[1] == "control" and e[2] == "chr" and e[4] == 0)
+	end
+	assert(found, "/dev/mapper/control not found")
+	print("test_fs: ok.")
+end
+
+
+------------------------------------------------------------------------
 
 test_mb()
 test_procinfo()
 test_stat()
 --~ test_tty_mode()
-test_fork()
+--~ test_fork()
+test_fs()
 
 
 ------------------------------------------------------------------------
