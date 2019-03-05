@@ -11,8 +11,10 @@ tty = require "l5.tty"
 fs = require "l5.fs"
 
 local spack, sunpack = string.pack, string.unpack
+local insert, concat = table.insert, table.concat
 
-local errm, rpad, pf, px = util.errm, util.rpad, util.pf, util.px
+local errm, rpad, repr = util.errm, util.rpad, util.repr
+local pf, px = util.pf, util.px
 
 ------------------------------------------------------------------------
 
@@ -198,7 +200,7 @@ function test_fs()
 	local found = false
 	for i, e in ipairs(dl) do
 --~ 		print(e[2], e[1]) -- ftype, fname
-		found = found or (e[1] == "bin" and e[2] == "dir")
+		found = found or (e[1] == "bin" and e[2] == "d")
 	end
 	assert(found, "/bin not found")
 	dl, em = fs.ls3("/dev/mapper")
@@ -206,9 +208,15 @@ function test_fs()
 	for i, e in ipairs(dl) do
 --~ 		print(e[2], e[1], e[3], e[4]) -- ftype, fname, mtime, size
 		found = found or 
-			(e[1] == "control" and e[2] == "chr" and e[4] == 0)
+			(e[1] == "control" and e[2] == "c" and e[4] == 0)
 	end
 	assert(found, "/dev/mapper/control not found")
+	dl, fl = fs.lsd("/bin")
+	assert(dl, fl)
+	local ds, fs = concat(dl, " "), concat(fl, " ")
+--~ 	print("dirs: ", ds, "\nfiles: ", fs)
+	assert(fs:find"bash", "bash not found in file list")
+	assert(ds:find"..", ".. not found in dir list")
 	print("test_fs: ok.")
 end
 
