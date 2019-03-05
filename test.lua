@@ -49,6 +49,12 @@ function test_procinfo()
 	assert(os.getenv(k) == nil)
 	l5.setenv(k, v); assert(os.getenv(k) == v)
 	l5.unsetenv(k); assert(os.getenv(k) == nil)
+	local el = l5.environ()
+	local r = false
+	for i, line in ipairs(el) do
+		r = r or line:match("PATH=.*/usr/bin")
+	end
+	assert(r)
 	print("test_procinfo: ok.")
 end
 

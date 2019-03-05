@@ -16,7 +16,7 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 
 #include <sys/types.h>	// getpid
 #include <sys/stat.h>	// stat
-#include <unistd.h>	// getpid getcwd getuid.. readlink read
+#include <unistd.h>	// getpid getcwd getuid.. readlink read environ
 #include <errno.h>	// errno
 #include <dirent.h>	// opendir...
 #include <fcntl.h>	// open
@@ -159,11 +159,6 @@ static int ll_mbgeti(lua_State *L) {
 	RET_INT(*(mb + 1 + idx));
 }
 
-// use byte offsets for all mb methods
-
-// execve envp: make it default to parent environ?
-
-
 //------------------------------------------------------------
 // l5 functions
 
@@ -205,11 +200,20 @@ static int ll_unsetenv(lua_State *L) {
 }
 
 static int ll_environ(lua_State *L) {
-	// lua api: environ() => env_mb
-	
+	// lua api: environ() => list of strings "key=value"
+	extern char **environ;
+	int i = 0;
+	char *eline = environ[i];
+	lua_newtable(L);
+	while (eline != NULL) {
+		//~ printf("ENV %s\n", eline);
+		lua_pushstring(L, eline);
+		lua_rawseti(L, -2, i+1);
+		i++;
+		eline = environ[i];
+	}
+	return 1;
 }
-
-
 
 static int ll_msleep(lua_State *L) {
 	// lua api: msleep(fd, ms)
@@ -701,6 +705,7 @@ static const struct luaL_Reg l5lib[] = {
 	{"getcwd", ll_getcwd},
 	{"setenv", ll_setenv},
 	{"unsetenv", ll_unsetenv},
+	{"environ", ll_environ},
 	//
 	{"msleep", ll_msleep},
 	{"fork", ll_fork},

@@ -35,6 +35,7 @@ errno() => errno value
 chdir(pathname)
 setenv(varname, value)
 unsetenv(varname)
+environ() => list of string "key=value"
 
 msleep(millisecs)
 fork() => pid
