@@ -195,7 +195,7 @@ end
 
 
 function test_fs()
-	local dl, em = fs.dir1("/")
+	local dl, em = fs.ls1("/")
 	assert(dl, em)
 	local found = false
 	for i, e in ipairs(dl) do
@@ -213,10 +213,12 @@ function test_fs()
 	assert(found, "/dev/mapper/control not found")
 	dl, fl = fs.lsd("/bin")
 	assert(dl, fl)
-	local ds, fs = concat(dl, " "), concat(fl, " ")
+	local dls, fls = concat(dl, " "), concat(fl, " ")
 --~ 	print("dirs: ", ds, "\nfiles: ", fs)
-	assert(fs:find"bash", "bash not found in file list")
-	assert(ds:find"..", ".. not found in dir list")
+	assert(fls:find"bash", "bash not found in file list")
+	assert(dls:find"..", ".. not found in dir list")
+--~ 	print("ls0 cur dir:", concat(fs.ls0(""), ", "))
+	
 	print("test_fs: ok.")
 end
 
