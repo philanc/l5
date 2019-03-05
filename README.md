@@ -38,7 +38,7 @@ unsetenv(varname)
 
 msleep(millisecs)
 fork() => pid
-wait() => pid, status
+waitpid(pid, flags) => pid, status
 kill(pid, sig)
 execve(pname, argv, envp)
 
@@ -48,6 +48,8 @@ closedir(dfd)
 readlink(pathname) => target pathname
 lstat5(pathname) => mode, size, mtime, uid, gid
 lstat(pathname, tbl) => tbl  --a list of stat fields
+mkdir(pathname)
+rmdir(pathname)
 
 open() => fd
 read(fd, buf, count) => n
