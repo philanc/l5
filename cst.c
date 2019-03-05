@@ -62,6 +62,7 @@ void main() {
 
 	// termios
 	dispsize(struct termios)
+	
 	dispintx(~(BRKINT | ICRNL | INPCK | ISTRIP | IXON))
 	dispintx(~(OPOST))
 	dispintx(CS8)
@@ -73,6 +74,7 @@ void main() {
 	dispint((char*)&(tos.c_line) - (char*)&tos)
 	dispint((char*)&(tos.c_cc) - (char*)&tos)
 	dispint((char*)&(tos.c_cc[VTIME]) - (char*)&tos)
+	dispsize(tos.c_cc)
 	
 	// ioctl
 	///f/p3/git/tmp/musl-1.1.18/include/bits/ioctl.h

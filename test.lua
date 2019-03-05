@@ -6,8 +6,12 @@ he = require "he" -- at https://github.com/philanc/he
 
 l5 = require "l5"
 
+util = require "l5.util"
+tty = require "l5.tty"
 
 local spack, sunpack = string.pack, string.unpack
+
+local errm, rpad, pf, px = util.errm, util.rpad, util.pf, util.px
 
 ------------------------------------------------------------------------
 
@@ -98,60 +102,50 @@ end
 ------------------------------------------------------------------------
 -- test ioctl() - set tty in raw mode and back to original mode
 
-function makerawmode(mode, opostflag)
-	-- mode is the content of struct termios for the current tty
-	-- return a termios content for tty raw mode (ie. no echo, 
-	-- read one key at a time, etc.)
-	-- taken from linenoise
-	-- see also musl src/termios/cfmakeraw.c
-	local fmt = "I4I4I4I4c6I1I1c36" -- struct termios is 60 bytes
-	local iflag, oflag, cflag, lflag, dum1, ccVTIME, ccVMIN, dum2 =
-		string.unpack(fmt, mode)
-	-- no break, no CRtoNL, no parity check, no strip, no flow control
-	-- .c_iflag &= ~(BRKINT | ICRNL | INPCK | ISTRIP | IXON)
-	iflag = iflag & 0xfffffacd
-	-- disable output post-processing
-	if not opostflag then oflag = oflag & 0xfffffffe end
-	-- set 8 bit chars -- .c_cflag |= CS8
-	cflag = cflag | 0x00000030
-	-- echo off, canonical off, no extended funcs, no signal (^Z ^C)
-	-- .c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG)
-	lflag = lflag & 0xffff7ff4
-	-- return every single byte, without timeout
-	ccVTIME = 0
-	ccVMIN = 1
-	return fmt:pack(iflag, oflag, cflag, lflag, 
-			dum1, ccVTIME, ccVMIN, dum2)
-end
 
-function getmode()
-	-- return mode, or nil, errno
-	return l5.ioctl(0, 0x5401, "", 60)
-end
-
-function setmode(mode)
-	-- return true or nil, errno
-	return l5.ioctl(0, 0x5404, mode)
-end
-
-function test_mode()
+function test_tty_mode()
 	-- get current mode
-	mode, err = getmode()
-	print("mmmm???", err)
-	print(he.stohex(mode, 16, ':'))
+	local cookedmode, eno = tty.getmode()
+	assert(cookedmode, errm(eno, "tty.getmode"))
+	assert(cookedmode:sub(1,36) == tty.initialmode:sub(1,36))
+		--why the difference, starting at c_cc[19] (tos+36) ???
 
-	print("test raw mode:  hit key, 'q' to quit.")
+	print("test raw mode (blocking):  hit key, 'q' to quit.")
 	-- set raw mode
-	setmode(makerawmode(mode))
-
+	nonblocking = nil
+	local rawmode = tty.makerawmode(cookedmode, nonblocking)
+	tty.setmode(rawmode)
+--~ 	tty.setmode(cookedmode)
+--~ 	tty.setrawmode()
 	while true do 
 		c = io.read(1)
 		if c == 'q' then break end
 		print(string.byte(c))
 	end
-	-- reset former mode
-	setmode(mode)
+	-- reset cooked mode
+--~ 	tty.setmode(cookedmode)
+	tty.restoremode()
 	print("\rback to normal cooked mode.")
+	
+	print("test raw mode (nonblocking):  hit key, 'q' to quit.")
+	-- set raw mode
+	nonblocking = true
+	local rawmode = tty.makerawmode(cookedmode, nonblocking)
+	tty.setmode(rawmode)
+	while true do 
+		c = io.read(1)
+		if not c then
+			io.write(".")
+			l5.msleep(500)
+		elseif c == 'q' then break
+		else	print(string.byte(c))
+		end
+	end
+	-- reset cooked mode
+--~ 	tty.setmode(cookedmode)
+	tty.restoremode()
+	print("\rback to normal cooked mode.")
+
 	print("test_mode: ok.")
 end
 
@@ -191,7 +185,7 @@ end
 test_mb()
 test_procinfo()
 test_stat()
---~ test_mode()
+--~ test_tty_mode()
 test_fork()
 
 
