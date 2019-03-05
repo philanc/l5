@@ -206,10 +206,8 @@ static int ll_environ(lua_State *L) {
 	char *eline = environ[i];
 	lua_newtable(L);
 	while (eline != NULL) {
-		//~ printf("ENV %s\n", eline);
 		lua_pushstring(L, eline);
-		lua_rawseti(L, -2, i+1);
-		i++;
+		lua_rawseti(L, -2, ++i); // index is 1-based in lua!
 		eline = environ[i];
 	}
 	return 1;
