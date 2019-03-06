@@ -265,18 +265,18 @@ static int ll_execve(lua_State *L) {
 	const char *pname = luaL_checkstring(L, 1);
 	int argvlen = lua_rawlen(L, 2);
 	int envplen = lua_rawlen(L, 3);
-	const char **argv = lua_newuserdata(L, argvlen + 8);
+	const char **argv = lua_newuserdata(L, (argvlen + 1) * 8);
 	int i;
 	for (i = 0; i < argvlen; i++) {
-		lua_pushinteger(L, i);
+		lua_pushinteger(L, i+1);
 		lua_rawget(L, 2);
 		argv[i] = lua_tostring(L, -1);
 		lua_pop(L, 1);
 	}
 	argv[argvlen] = NULL;
-	const char **envp = lua_newuserdata(L, envplen + 8);
+	const char **envp = lua_newuserdata(L, (envplen + 1) * 8);
 	for (i = 0; i < envplen; i++) {
-		lua_pushinteger(L, i);
+		lua_pushinteger(L, i+1);
 		lua_rawget(L, 3);
 		envp[i] = lua_tostring(L, -1);
 		lua_pop(L, 1);

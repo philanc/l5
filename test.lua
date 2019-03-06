@@ -246,6 +246,11 @@ test_stat()
 test_fs()
 
 
+-- test execve
+--~ l5.execve("/usr/bin/env", {"/usr/bin/env"}, {"AAA=AAAVALUE"})
+--~ l5.execve("/bin/cat", {"/bin/cat", "--help"}, {"AAA=AAAVALUE"})
+
+
 ------------------------------------------------------------------------
 --[[  
 
