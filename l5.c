@@ -17,6 +17,7 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 #include <sys/types.h>	// getpid
 #include <sys/stat.h>	// stat
 #include <unistd.h>	// getpid getcwd getuid.. readlink read environ
+			// symlink
 #include <errno.h>	// errno
 #include <dirent.h>	// opendir...
 #include <fcntl.h>	// open
@@ -274,6 +275,82 @@ static int ll_execve(lua_State *L) {
 	RET_ERRNO; // execve returns only on error
 }
 
+//----------------------------------------------------------------------
+// basic I/O
+
+static int ll_open(lua_State *L) {
+	const char *pname = luaL_checkstring(L, 1);
+	int flags = luaL_checkinteger(L, 2);
+	mode_t mode = luaL_checkinteger(L, 3);
+	int r = open(pname, flags, mode);
+	if (r == -1) RET_ERRNO; 
+	RET_INT(r);
+}
+
+static int ll_close(lua_State *L) {
+	int fd = luaL_checkinteger(L, 1);
+	int r = close(fd);
+	if (r == -1) RET_ERRNO; else RET_TRUE;
+}
+
+static int ll_read(lua_State *L) {
+	// lua api: read(fd, buf, count)
+	// attempt to read up to count bytes into buffer buf
+	// (the buffer is a memory block (mb) - see mbnew() above.
+	// return number of read bytes or nil, errno
+	int fd = luaL_checkinteger(L, 1);
+	char *mb = lua_touserdata(L, 2);
+	int count = luaL_checkinteger(L, 3);
+	if (count > MBSIZE(mb)) LERR("out of range");
+	int n = read(fd, MBPTR(mb), count);
+	if (n == -1) RET_ERRNO;
+	RET_INT(n);
+}
+
+static int ll_read4k(lua_State *L) { 
+	// lua api:  read4k(fd) => readbytes
+	// attempt to read 4,096 bytes (ie. 4kb)
+	// return read bytes as a string or nil, errno
+	//
+	//--- KEEP IT??  --- can be implemented with a unique mb buffer:
+	// mb=mbnew(4096); n=read(fd, mb, 4096); return mb:get(1, n)
+	//
+	char buf[4096];
+	int fd = luaL_checkinteger(L, 1);
+	int n = read(fd, buf, 4096);
+	if (n == -1) RET_ERRNO;
+	RET_STRN(buf, n);
+}
+
+static int ll_write(lua_State *L) {
+	// lua api: write(fd, str)
+	// attempt to write all the bytes in string str
+	// return number of bytes actually written, or nil, errno
+	int fd = luaL_checkinteger(L, 1);
+	int64_t len;
+	const char *str = luaL_checklstring(L, 2, &len);	
+	int n = write(fd, str, len);
+	if (n == -1) RET_ERRNO;
+	RET_INT(n);
+}
+
+static int ll_dup2(lua_State *L) {
+	// lua api: dup2(oldfd [, newfd]) => newfd | nil, errno
+	// if newfd is not provided, return dup(oldfd)
+	int oldfd = luaL_checkinteger(L, 1);
+	int newfd = luaL_optinteger(L, 2, -1);
+	if (newfd == -1) newfd = dup(oldfd);
+	else newfd = dup2(oldfd, newfd);
+	if (newfd == -1) RET_ERRNO;
+	RET_INT(newfd);
+}
+
+//----------------------------------------------------------------------
+// directories, filesystem 
+
+
+
+
 static int ll_opendir(lua_State *L) {
 	// lua api: opendir(pathname) => dirhandle (lightuserdata)
 	DIR *dp = opendir(luaL_checkstring(L, 1));
@@ -361,6 +438,15 @@ static int ll_lstat(lua_State *L) {
 	return 1;
 }
 
+static int ll_symlink(lua_State *L) {
+	// lua api:  symlink(target, linkpath) => true | nil, errno
+	//
+	const char *target = luaL_checkstring(L, 1);
+	const char *linkpath = luaL_checkstring(L, 2);
+	int n = symlink(target, linkpath);
+	if (n == -1) RET_ERRNO; else RET_TRUE;	
+}
+
 static int ll_mkdir(lua_State *L) {
 	const char *pname = luaL_checkstring(L, 1);
 	int mode = luaL_optinteger(L, 2, 0);
@@ -374,76 +460,6 @@ static int ll_rmdir(lua_State *L) {
 	if (n == -1) RET_ERRNO; else RET_TRUE;
 }
 
-
-//----------------------------------------------------------------------
-// basic I/O
-
-static int ll_open(lua_State *L) {
-	const char *pname = luaL_checkstring(L, 1);
-	int flags = luaL_checkinteger(L, 2);
-	mode_t mode = luaL_checkinteger(L, 3);
-	int r = open(pname, flags, mode);
-	if (r == -1) RET_ERRNO; 
-	RET_INT(r);
-}
-
-static int ll_close(lua_State *L) {
-	int fd = luaL_checkinteger(L, 1);
-	int r = close(fd);
-	if (r == -1) RET_ERRNO; else RET_TRUE;
-}
-
-static int ll_read(lua_State *L) {
-	// lua api: read(fd, buf, count)
-	// attempt to read up to count bytes into buffer buf
-	// (the buffer is a memory block (mb) - see mbnew() above.
-	// return number of read bytes or nil, errno
-	int fd = luaL_checkinteger(L, 1);
-	char *mb = lua_touserdata(L, 2);
-	int count = luaL_checkinteger(L, 3);
-	if (count > MBSIZE(mb)) LERR("out of range");
-	int n = read(fd, MBPTR(mb), count);
-	if (n == -1) RET_ERRNO;
-	RET_INT(n);
-}
-
-static int ll_read4k(lua_State *L) { 
-	// lua api:  read4k(fd) => readbytes
-	// attempt to read 4,096 bytes (ie. 4kb)
-	// return read bytes as a string or nil, errno
-	//
-	//--- KEEP IT??  --- can be implemented with a unique mb buffer:
-	// mb=mbnew(4096); n=read(fd, mb, 4096); return mb:get(1, n)
-	//
-	char buf[4096];
-	int fd = luaL_checkinteger(L, 1);
-	int n = read(fd, buf, 4096);
-	if (n == -1) RET_ERRNO;
-	RET_STRN(buf, n);
-}
-
-static int ll_write(lua_State *L) {
-	// lua api: write(fd, str)
-	// attempt to write all the bytes in string str
-	// return number of bytes actually written, or nil, errno
-	int fd = luaL_checkinteger(L, 1);
-	int64_t len;
-	const char *str = luaL_checklstring(L, 2, &len);	
-	int n = write(fd, str, len);
-	if (n == -1) RET_ERRNO;
-	RET_INT(n);
-}
-
-static int ll_dup2(lua_State *L) {
-	// lua api: dup2(oldfd [, newfd]) => newfd | nil, errno
-	// if newfd is not provided, return dup(oldfd)
-	int oldfd = luaL_checkinteger(L, 1);
-	int newfd = luaL_optinteger(L, 2, -1);
-	if (newfd == -1) newfd = dup(oldfd);
-	else newfd = dup2(oldfd, newfd);
-	if (newfd == -1) RET_ERRNO;
-	RET_INT(newfd);
-}
 
 static int ll_mount(lua_State *L) {
 	// lua api: mount(src, dest, fstype, flags, data)
@@ -713,21 +729,22 @@ static const struct luaL_Reg l5lib[] = {
 	{"kill", ll_kill},
 	{"execve", ll_execve},
 	//
-	{"opendir", ll_opendir},
-	{"readdir", ll_readdir},
-	{"closedir", ll_closedir},
-	{"readlink", ll_readlink},
-	{"lstat3", ll_lstat3},
-	{"lstat", ll_lstat},
-	{"mkdir", ll_mkdir},
-	{"rmdir", ll_rmdir},
-	//
 	{"open", ll_open},
 	{"close", ll_close},
 	{"read", ll_read},
 	{"read4k", ll_read4k},
 	{"write", ll_write},
 	{"dup2", ll_dup2},
+	//
+	{"opendir", ll_opendir},
+	{"readdir", ll_readdir},
+	{"closedir", ll_closedir},
+	{"readlink", ll_readlink},
+	{"lstat3", ll_lstat3},
+	{"lstat", ll_lstat},
+	{"symlink", ll_symlink},
+	{"mkdir", ll_mkdir},
+	{"rmdir", ll_rmdir},
 	{"mount", ll_mount},
 	{"umount", ll_umount},
 	//

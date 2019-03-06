@@ -43,21 +43,22 @@ waitpid(pid, flags) => pid, status
 kill(pid, sig)
 execve(pname, argv, envp)
 
-opendir(pathname) => dfd
-readdir(dfd) => pathname, filetype
-closedir(dfd)
-readlink(pathname) => target pathname
-lstat3(pathname) => mode, size, mtime
-lstat(pathname, tbl) => tbl  --a list of stat fields
-mkdir(pathname)
-rmdir(pathname)
-
 open() => fd
 read(fd, buf, count) => n
 read4k(fd) => str -- read 4 kbytes
 write(fd, str) => n
 close(fd)
 dup2(oldfd [, newfd]) => newfd
+
+opendir(pathname) => dfd
+readdir(dfd) => pathname, filetype
+closedir(dfd)
+readlink(pathname) => target pathname
+lstat3(pathname) => mode, size, mtime
+lstat(pathname, tbl) => tbl  --a list of stat fields
+symlink(target, linkpath)
+mkdir(pathname)
+rmdir(pathname)
 
 mount(src, dest, fstype, flags, data)
 umount(dest)
