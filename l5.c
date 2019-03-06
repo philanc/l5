@@ -311,10 +311,10 @@ static int ll_readlink(lua_State *L) {
 	RET_STRN(buf, n);
 }
 
-static int ll_lstat5(lua_State *L) {
-	// lua api: lstat5(path [,statflag:int])
+static int ll_lstat3(lua_State *L) {
+	// lua api: lstat3(path [,statflag:int])
 	// if statflag=1: do stat(). default: do lstat
-	// return mode, size, mtime(sec), uid, gid
+	// return mode, size, mtime(sec)
 	struct stat buf;
 	int r;
 	const char *pname = luaL_checkstring(L, 1);
@@ -325,9 +325,7 @@ static int ll_lstat5(lua_State *L) {
 	lua_pushinteger(L, buf.st_mode);
 	lua_pushinteger(L, buf.st_size);
 	lua_pushinteger(L, buf.st_mtim.tv_sec);
-	lua_pushinteger(L, buf.st_uid);
-	lua_pushinteger(L, buf.st_gid);
-	return 5;
+	return 3;
 }
 
 static int ll_lstat(lua_State *L) {
@@ -719,7 +717,7 @@ static const struct luaL_Reg l5lib[] = {
 	{"readdir", ll_readdir},
 	{"closedir", ll_closedir},
 	{"readlink", ll_readlink},
-	{"lstat5", ll_lstat5},
+	{"lstat3", ll_lstat3},
 	{"lstat", ll_lstat},
 	{"mkdir", ll_mkdir},
 	{"rmdir", ll_rmdir},

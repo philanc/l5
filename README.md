@@ -47,7 +47,7 @@ opendir(pathname) => dfd
 readdir(dfd) => pathname, filetype
 closedir(dfd)
 readlink(pathname) => target pathname
-lstat5(pathname) => mode, size, mtime, uid, gid
+lstat3(pathname) => mode, size, mtime
 lstat(pathname, tbl) => tbl  --a list of stat fields
 mkdir(pathname)
 rmdir(pathname)

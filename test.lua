@@ -79,31 +79,29 @@ S_IFIFO = 0x00001000
 function test_stat()
 	-- assume the current dir is "some/path/l5" and contains l5.c
 	os.execute("rm -f l5symlink; ln -s l5.c l5symlink")
-	local lmode, lsize, lmtim, luid, lgid = l5.lstat5("l5symlink")
---~ 	he.printf("  mode: %o  size: %d  mtim: %s  uid: %d gid: %d", 
---~ 		lmode, lsize, he.isodate19(lmtim), luid, lgid)
+	local lmode, lsize, lmtim = l5.lstat3("l5symlink")
+--~ 	he.printf("  mode: %o  size: %d  mtim: %s ", 
+--~ 		lmode, lsize, he.isodate19(lmtim) )
 	assert(lsize == 4)
 	assert(lmode & 0xf000 == 0xa000) -- type is symlink
 	assert(lmode & 0xfff == 0x01ff) -- perm is '0777'
 	local target = l5.readlink("l5symlink")
 	assert(target == "l5.c")
-	local mode, size, mtim, uid, gid = l5.lstat5("l5.c")
---~ 	he.printf("  mode: %o  size: %d  mtim: %s  uid: %d gid: %d", 
---~ 		mode, size, he.isodate19(mtim), uid, gid)
+	local mode, size, mtim = l5.lstat3("l5.c")
+--~ 	he.printf("  mode: %o  size: %d  mtim: %s ", 
+--~ 		mode, size, he.isodate19(mtim) )
 	assert(mode & 0xf000 == 0x8000)
-	assert(uid == luid and gid == lgid)
 	t = l5.lstat("l5.c", {})
-	assert(t[3]==mode and t[5]==uid and t[6]==gid and t[8]==size
-		and t[12]==mtim)
+	assert(t[3]==mode and t[8]==size and t[12]==mtim)
 	-- test mkdir
 	local r, eno, em
 	local dn = "/tmp/l5td"
 	r, eno = l5.mkdir(dn)
-	mode, size, mtim, uid, gid = l5.lstat5(dn)
+	mode, size, mtim = l5.lstat3(dn)
 	assert(mode & S_IFMT == S_IFDIR)
 	r, eno = l5.rmdir(dn)
 	assert(r)
-	mode, size, mtim, uid, gid = l5.lstat5(dn)
+	mode, size, mtim = l5.lstat3(dn)
 --~ 	print('dir', mode, size)
 	assert((not mode) and size==2) -- here size == errno == ENOENT
 	print("test_stat: ok.")
