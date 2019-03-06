@@ -60,43 +60,37 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 #define DEFAULT_TIMEOUT 10000
 
 //----------------------------------------------------------------------
-// memory block object
-// userdata, allocated memory - bytesize is stored in the first 8 bytes
-// api: memory block either as a byte array or a int64 array:
+// memory buffer object
+// userdata, allocated memory.  api: 
 // new(bytesize) => mb  --(bytesize must be multiple of 8)
 // get(mb, byteindex, len) => string
 // set(mb, byteindex, string)
-// geti(mb, int64index) => integer
-// seti(mb, int64index, integer)
+// geti(mb, byteindex) => integer -- index must be aligned
+// seti(mb, byteindex, integer)   -- index must be aligned
 //
-// Usage in C
-// 	void *mb = lua_touserdata(L, idx); // get mb from the Lua stack
-//	size_t size = MBSIZE(mb) // size of the available memory block
-//	void *ptr = MBPTR(mb) // pointer to the start of the memory block
+// Usage in C  - with a mb object on the stack at index idx:
+//	
+// 	char *mb = lua_touserdata(L, idx); // get a pointer to buffer
+//	size_t size = lua_rawlen(L, idx);  // get buffer size
 
-#define MBPTR(mb) ((void *)(((char *)mb)+8))
-#define MBSIZE(mb) (*((int64_t *) mb))
-
-#define MBNAME "mb_memory_block"
+#define MBNAME "mb_memory_buffer"
 
 static int ll_mbnew(lua_State *L) {
-	// lua api: mbnew(size) => mb, ptr
-	// return a memory block with the given size and a pointer 
+	// lua api: mbnew(size) => mb, ptr as integer
+	// return a memory buffer with the given size and a pointer 
 	// to the beginning of the block as a Lua integer
 	// the memory block is zeroed.
 	size_t size = luaL_checkinteger(L, 1);
 	if ((size % 8) != 0) LERR("mbnew: size must be multiple of 8");
-	char *mb = (char *) lua_newuserdata(L, size + 8);
-	MBSIZE(mb) = size;
-	memset(mb+8, 0, size); 
+	char *mb = (char *) lua_newuserdata(L, size);
+	memset(mb, 0, size); 
 	luaL_getmetatable(L, MBNAME);
 	lua_setmetatable(L, -2);
-	lua_pushinteger(L, (int64_t)(mb + 8));
+	lua_pushinteger(L, (int64_t)mb);
 	return 2;
 }
 
 static int ll_mbget(lua_State *L) {
-	// the memory block is seen as a byte array
 	// lua api:  mb:get(idx, len)
 	// return the len bytes at offset idx as a string
 	// byte offset start at 0
@@ -105,25 +99,24 @@ static int ll_mbget(lua_State *L) {
 	// if idx is not provided, it defaults to 0
 	// so mg:get() returns all the content of the mb as a string
 	char *mb = lua_touserdata(L, 1);
-	int64_t size = MBSIZE(mb);
+	int64_t size = lua_rawlen(L, 1);
 	int64_t idx = luaL_optinteger(L, 2, 0);
 	int64_t len = luaL_optinteger(L, 3, size);
 	if ((idx+len) > size) LERR("out of range");
-	RET_STRN(mb + 8 + idx, len);
+	RET_STRN(mb + idx, len);
 }
 
 static int ll_mbset(lua_State *L) {
-	// the memory block is seen as a byte array
 	// lua api:  mb:set(idx, str)
 	// copy string str in mb at byte offset idx (starting at 0) 
 	// if  string is too long to fit, the function errors.
 	char *mb = lua_touserdata(L, 1);
-	int64_t size = MBSIZE(mb);
+	int64_t size = lua_rawlen(L, 1);
 	int64_t idx = luaL_checkinteger(L, 2);
 	int64_t len;
 	const char *str = luaL_checklstring(L, 3, &len);
 	if ((idx+len) > size) LERR("out of range");	
-	memcpy(mb + 8 + idx, str, len);
+	memcpy(mb + idx, str, len);
 	RET_TRUE;
 }
 
@@ -131,21 +124,21 @@ static int ll_mbzero(lua_State *L) {
 	// lua api:  mb:zero()
 	// fill the memory block with zeros
 	char *mb = lua_touserdata(L, 1);
-	int64_t size = MBSIZE(mb);
-	memset(mb+8, 0, size);
+	int64_t size = lua_rawlen(L, 1);
+	memset(mb, 0, size);
 	RET_TRUE;
 }
 	
 static int ll_mbseti(lua_State *L) {
 	// lua api: mb:seti(idx, i)
-	// mb is seen as an array of int64, starting at offset 0
-	// mb:seti(idx, i) sets element at offset idx to the value i
-	int64_t *mb = lua_touserdata(L, 1);
+	// writes integer i at byte offset idx (starting at 0)
+	char *mb = lua_touserdata(L, 1);
+	int64_t size = lua_rawlen(L, 1);
 	int64_t idx = luaL_checkinteger(L, 2);
 	int64_t i = luaL_checkinteger(L, 3);
-	int64_t max = MBSIZE(mb) / 8;
-	if ((idx < 0) || (idx > max-1)) LERR("out of range");
-	*(mb + 1 + idx) = i;
+	if ((idx < 0) || (idx >= size)) LERR("out of range");
+	if ((idx & 7) != 0) LERR("unaligned access");
+	*((int64_t *)(mb + idx)) = i;
 	RET_TRUE;
 }
 
@@ -153,11 +146,12 @@ static int ll_mbgeti(lua_State *L) {
 	// lua api: mb:geti(idx)
 	// mb is seen as an array of int64, starting at offset 0
 	// mb:geti(idx) returns the element at offset idx
-	int64_t *mb = lua_touserdata(L, 1);
+	char *mb = lua_touserdata(L, 1);
+	int64_t size = lua_rawlen(L, 1);
 	int64_t idx = luaL_checkinteger(L, 2);
-	int64_t max = MBSIZE(mb) / 8;
-	if ((idx < 0) || (idx > max-1)) LERR("out of range");
-	RET_INT(*(mb + 1 + idx));
+	if ((idx < 0) || (idx >= size)) LERR("out of range");
+	if ((idx & 7) != 0) LERR("unaligned access");
+	RET_INT(*((int64_t *)(mb + idx)));
 }
 
 //------------------------------------------------------------
@@ -271,7 +265,7 @@ static int ll_execve(lua_State *L) {
 	const char *pname = luaL_checkstring(L, 1);
 	char *argv_mb = (char *)lua_touserdata(L, 2);
 	char *envp_mb = (char *)lua_touserdata(L, 3);
-	execve(pname, MBPTR(argv_mb), MBPTR(envp_mb));
+	execve(pname, (char **)argv_mb, (char **)envp_mb);
 	RET_ERRNO; // execve returns only on error
 }
 
@@ -300,9 +294,10 @@ static int ll_read(lua_State *L) {
 	// return number of read bytes or nil, errno
 	int fd = luaL_checkinteger(L, 1);
 	char *mb = lua_touserdata(L, 2);
+	int64_t size = lua_rawlen(L, 2);
 	int count = luaL_checkinteger(L, 3);
-	if (count > MBSIZE(mb)) LERR("out of range");
-	int n = read(fd, MBPTR(mb), count);
+	if (count > size) LERR("out of range");
+	int n = read(fd, mb, count);
 	if (n == -1) RET_ERRNO;
 	RET_INT(n);
 }
@@ -519,9 +514,11 @@ static int ll_poll(lua_State *L) {
 	// timeout:  timeout in millisecs
 	//
 	void *mb = (void *)lua_touserdata(L, 1);
+	int64_t size = lua_rawlen(L, 1);
 	int nfds = luaL_checkinteger(L, 2);
+	if (nfds * 8 <= size) LERR("out of range");
 	int timeout = luaL_optinteger(L, 3, DEFAULT_TIMEOUT); 
-	struct pollfd *pfd = MBPTR(mb);
+	struct pollfd *pfd = (struct pollfd *)mb;
 	int n = poll(pfd, nfds, timeout);
 	if (n < 0) RET_ERRNO;
 	RET_INT(n);

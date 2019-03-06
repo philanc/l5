@@ -21,15 +21,14 @@ local pf, px = util.pf, util.px
 function test_mb()
 	-- test memory block (mb) methods
 	mb = l5.mbnew(1024)
-	assert(mb:seti(12, 123))
-	assert(mb:geti(12) == 123)
---~ 	print(mb:mbgeti(100))-- may or may not be 0
+	assert(mb:seti(48, 123))
+	assert(mb:geti(48) == 123)
 	assert(mb:zero())
-	assert(mb:geti(12) == 0)
+	assert(mb:geti(48) == 0)
 	mb:zero()
 	assert(mb:set(16, "abc"))
 	assert(mb:get(16, 5) == "abc\0\0")
-	assert(mb:geti(2) & 0xff == 97) -- !! little endian only :-)
+	assert(mb:geti(16) & 0xff == 97) -- !! little endian only :-)
 	print("test_mb: ok.")
 end
 
