@@ -59,8 +59,9 @@ function test_dm_devlist() -- list all devices
 	local dl, em = dm.devlist()
 	if not dl then print(em); return end
 	for i, x in ipairs(dl) do
-		pf("dev: %x (%d:%d)  name: %s", 
-			x.dev, x.dev>>8, x.dev&0xff, x.name)
+		pf("dev: %x (%d:%d)  devname: %s   name: %s", 
+			x.dev, x.dev>>8, x.dev&0xff, 
+			dm.devname(x.dev), x.name )
 	end
 	print("test_dm_devlist: ok.")
 end
@@ -89,18 +90,6 @@ function test_loop_status()
 	return true
 end
 
-function test_loop_status7()
-	local devname, fname, em
-	devname = "/dev/loop7"
-	fname, em = loop.status(devname)
-	if not fname then
-		print(devname, em)
-		return nil, em
-	end
-	pf("%s setup on file %s", devname, fname)
-	print("test_loop_status done.")
-	return true
-end
 
 function test_loop_remove()
 	local devname, s, em
@@ -123,8 +112,11 @@ function test_dm_setup()
 		print("test_dm_setup", em)
 		return nil, em
 	end
-	print("test_dm_setup done.")
-	return true
+	local dmdev = r
+	assert(dmdev >> 8 == 0xfb)
+	local dmdevname = "/dev/dm-" .. tostring(dmdev & 0xff)
+	print("test_dm_setup done.  dm devname:", dmdevname)
+	return dmdevname
 end
 
 function test_dm_gettable()
@@ -153,12 +145,14 @@ end
 
 
 
-function test_mount()
+function test_mount(dmdevname)
 	-- mount the filesystem, read a file, and umount it.
 	--
 --~ 	os.execute("ls -l /dev/mapper")
-	local mpt = "/tmp/m6"
-	local r, eno = l5.mount("/dev/mapper/loo6", mpt, "ext4", 0, "")
+--~ 	local msrc, mpt = "/dev/mapper/loo6", "/tmp/m6"
+	local msrc, mpt = dmdevname, "/tmp/m6"
+	pf("test_mount: mounting %s on %s...", msrc, mpt)
+	local r, eno = l5.mount(msrc, mpt, "ext4", 0, "")
 	if not r then
 		print(errm(eno, "mount"))
 		return nil, eno
@@ -184,7 +178,7 @@ test_dm_version()
 assert(test_loop_setup())
 test_blkgetsize()
 --
-assert(test_dm_setup())
+dmdevname = assert(test_dm_setup())
 test_dm_devlist()
 test_dm_gettable()
 
@@ -200,7 +194,7 @@ test_dm_gettable()
 -- need some delay here. else mount fails (ENOENT)
 -- why?  some udev issue?
 l5.msleep(100) 
-test_mount()
+test_mount(dmdevname)
 
 -- remove the dmcrypt layer
 test_dm_remove()

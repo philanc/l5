@@ -176,13 +176,14 @@ function dm.setup(dname, tblstr)
 	local start, siz, typ, opt = tblstr:match(pat)
 	local cfd = dm_opencontrol()
 	local r, em = dm_create(cfd, dname)
+	local dmdev = r  -- the dm device (eg. 0xfb01 for /dev/dm-1)
 	if not r then goto close end
 	r, em = dm_tableload(cfd, dname, start, siz, typ, opt)
 	if not r then goto close end
 	r, em = dm_suspend(cfd, dname)
 	::close::
 	l5.close(cfd)
-	if em then return nil, em else return true end
+	if em then return nil, em else return dmdev end
 end
 
 function dm.remove(dname)
@@ -206,6 +207,14 @@ function dm.devlist()
 	return dl, em
 end
 
+function dm.devname(dev)
+	-- return the device name for a given dev
+	-- (returns the actual devname, not the symlink in /dev/mapper
+	-- that may be created if udev is running)
+	-- eg. devname(0xfb01) => "/dev/dm-1"
+	assert(dev >> 8 == 0xfb, "not a mapper device")
+	return "/dev/dm-" .. tostring(dev & 0xff)
+end
 
 
 function dm.version()
