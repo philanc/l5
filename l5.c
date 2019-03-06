@@ -259,13 +259,30 @@ static int ll_kill(lua_State *L) {
 }
 
 static int ll_execve(lua_State *L) {
-	// lua api: execve(pname, argv_mb, envp_mb) => nothing | nil, errno
-	// the calling program must prepare memory blocks (mb) containing
-	// valid argv[] and envp[]
+	// lua api: execve(pname, argv, envp) => nothing | nil, errno
+	// argv and envp are lists of strings. For envp, each string
+	// is of the form 'varname=varvalue'
 	const char *pname = luaL_checkstring(L, 1);
-	char *argv_mb = (char *)lua_touserdata(L, 2);
-	char *envp_mb = (char *)lua_touserdata(L, 3);
-	execve(pname, (char **)argv_mb, (char **)envp_mb);
+	int argvlen = lua_rawlen(L, 2);
+	int envplen = lua_rawlen(L, 3);
+	const char **argv = lua_newuserdata(L, argvlen + 8);
+	int i;
+	for (i = 0; i < argvlen; i++) {
+		lua_pushinteger(L, i);
+		lua_rawget(L, 2);
+		argv[i] = lua_tostring(L, -1);
+		lua_pop(L, 1);
+	}
+	argv[argvlen] = NULL;
+	const char **envp = lua_newuserdata(L, envplen + 8);
+	for (i = 0; i < envplen; i++) {
+		lua_pushinteger(L, i);
+		lua_rawget(L, 3);
+		envp[i] = lua_tostring(L, -1);
+		lua_pop(L, 1);
+	}
+	envp[envplen] = NULL;
+	execve(pname, (char **)argv, (char **)envp);
 	RET_ERRNO; // execve returns only on error
 }
 
