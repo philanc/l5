@@ -218,6 +218,22 @@ function test_fs()
 	assert(fls:find"bash", "bash not found in file list")
 	assert(dls:find"..", ".. not found in dir list")
 --~ 	print("ls0 cur dir:", concat(fs.ls0(""), ", "))
+--~ 	local ffl = fs.findfiles("/etc/udev")
+--~ 	local ffl = fs.findall("/etc/udev")
+--~ 	he.pp(ffl)
+	local pn, fa
+	pn = "l5.c"; fa = fs.stat(pn)
+--~ 	print(pn, fs.ftype(fa), fs.fperms(fa), fs.fsize(fa), 
+--~ 		"is executable: ", fs.fexec(fa))
+	assert(fs.ftype(fa)=="r" and not fs.fexec(fa))
+	pn = "/bin/bash"; fa = fs.stat(pn)
+--~ 	print(pn, fs.ftype(fa), fs.fperms(fa), fs.fsize(fa),
+--~ 		"is executable: ", fs.fexec(fa))
+	assert(fs.ftype(fa)=="r" and fs.fexec(fa))
+	pn = "l5/"; fa = fs.stat(pn)
+--~ 	print(pn, fs.ftype(fa), fs.fperms(fa), fs.fsize(fa),
+--~ 		"is executable: ", fs.fexec(fa))
+	assert(fs.ftype(fa)=="d" and not fs.fexec(fa))
 	
 	print("test_fs: ok.")
 end
