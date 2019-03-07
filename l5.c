@@ -268,10 +268,10 @@ static int ll_execve(lua_State *L) {
 	const char **argv = lua_newuserdata(L, (argvlen + 1) * 8);
 	int i;
 	for (i = 0; i < argvlen; i++) {
-		lua_pushinteger(L, i+1);
-		lua_rawget(L, 2);
-		argv[i] = lua_tostring(L, -1);
-		lua_pop(L, 1);
+		lua_pushinteger(L, i+1); //push table key
+		lua_rawget(L, 2);	  //replace key with value
+		argv[i] = lua_tostring(L, -1); // get the value
+		lua_pop(L, 1); // pop the value
 	}
 	argv[argvlen] = NULL;
 	const char **envp = lua_newuserdata(L, (envplen + 1) * 8);
@@ -305,16 +305,18 @@ static int ll_close(lua_State *L) {
 }
 
 static int ll_read(lua_State *L) {
-	// lua api: read(fd, buf, count)
+	// lua api: read(fd, buf, count [, offset])
 	// attempt to read up to count bytes into buffer buf
-	// (the buffer is a memory block (mb) - see mbnew() above.
+	// read bytes are stored in buffer at offset (defaults to 0)
+	// the buffer is a memory buffer object (mb) - see mbnew() above.
 	// return number of read bytes or nil, errno
 	int fd = luaL_checkinteger(L, 1);
 	char *mb = lua_touserdata(L, 2);
 	int64_t size = lua_rawlen(L, 2);
-	int count = luaL_checkinteger(L, 3);
-	if (count > size) LERR("out of range");
-	int n = read(fd, mb, count);
+	int64_t count = luaL_checkinteger(L, 3);
+	int64_t offset = luaL_optinteger(L, 4, 0);
+	if (offset + count > size) LERR("out of range");
+	int n = read(fd, mb + offset, count);
 	if (n == -1) RET_ERRNO;
 	RET_INT(n);
 }
@@ -335,13 +337,19 @@ static int ll_read4k(lua_State *L) {
 }
 
 static int ll_write(lua_State *L) {
-	// lua api: write(fd, str)
-	// attempt to write all the bytes in string str
+	// lua api: write(fd, str [, idx, count])
+	// attempt to write count bytes in string str starting at 
+	// index 'idx'. count defaults to (#str-idx+1), idx defaults to 1, 
+	// ie. write(fd, str) attempts to write all bytes in str.
 	// return number of bytes actually written, or nil, errno
 	int fd = luaL_checkinteger(L, 1);
-	int64_t len;
+	int64_t len, idx, count;
 	const char *str = luaL_checklstring(L, 2, &len);	
-	int n = write(fd, str, len);
+	idx = luaL_optinteger(L, 3, 1);
+	count = len + idx - 1;
+	count = luaL_optinteger(L, 4, count);
+	if ((idx < 1) || (idx + count - 1 > len)) LERR("out of range");
+	int n = write(fd, str + idx - 1, count);
 	if (n == -1) RET_ERRNO;
 	RET_INT(n);
 }
