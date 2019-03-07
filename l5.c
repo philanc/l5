@@ -629,6 +629,43 @@ static int ll_connect(lua_State *L) {
 	if (r < 0) RET_ERRNO; else RET_TRUE;
 }
 
+static int ll_recvfrom(lua_State *L) {
+	// lua api: recvfrom(fd, buf, count, flags) => n, sockaddr
+	// receive up to count bytes into buffer buf
+	// the buffer is a memory buffer object (mb) - see mbnew() above.
+	// return number of read bytes or nil, errno
+	int fd = luaL_checkinteger(L, 1);
+	char *mb = lua_touserdata(L, 2);
+	int64_t size = lua_rawlen(L, 2);
+	int64_t count = luaL_checkinteger(L, 3);
+	if (count > size) LERR("out of range");
+	int flags = luaL_checkinteger(L, 4);
+	char addrbuf[256];
+	socklen_t addrbuflen;
+	int n = recvfrom(fd, mb, count, flags, 
+		(struct sockaddr *)&addrbuf, &addrbuflen);
+	if (n == -1) RET_ERRNO;
+	lua_pushlstring(L, addrbuf, addrbuflen);
+	lua_pushinteger(L, n);
+	return 2;
+}
+
+static int ll_sendto(lua_State *L) {
+	// lua api: sendto(fd, str, sockaddr)
+	// attempt to send string str at aaddress sockaddr
+	// return number of bytes actually sent, or nil, errno
+	int fd = luaL_checkinteger(L, 1);
+	int64_t len, count, salen;
+	const char *str = luaL_checklstring(L, 2, &len);	
+	int flags = luaL_checkinteger(L, 3);
+	struct sockaddr *sa = (struct sockaddr *)luaL_checklstring(
+		L, 4, &salen);	
+	int n = sendto(fd, str, len, flags, sa, salen);
+	if (n == -1) RET_ERRNO;
+	RET_INT(n);
+}
+
+
 static int ll_getsockname(lua_State *L) {
 	// get the address a socket is bound to
 	// lua api: getsockname(fd) => sockaddr | nil, errno
@@ -652,6 +689,7 @@ static int ll_getpeername(lua_State *L) {
 	if (n == -1) RET_ERRNO;
 	RET_STRN((char *)&addr, len);
 }
+
 
 static int ll_getaddrinfo(lua_State *L) {
 	// interface to DNS:
