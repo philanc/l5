@@ -12,6 +12,15 @@ local errm, rpad, pf, px = util.errm, util.rpad, util.pf, util.px
 
 ------------------------------------------------------------------------
 
+--[[
+
+Notes:
+
+  
+
+
+
+]]
 
 
 ------------------------------------------------------------------------
@@ -20,6 +29,7 @@ local errm, rpad, pf, px = util.errm, util.rpad, util.pf, util.px
 sock = {}
 
 sock.DONTWAIT = 0x40  -- non-blocking flag for send/recv functions
+sock.BUFSIZE1 = 1280  -- max size of a msg for send1/recv1 functions
 
 
 function sock.parse_ipv4_sockaddr(sockaddr)
@@ -72,8 +82,8 @@ function sock.sbind(sockaddr)
 	local fd, eno = l5.socket(family, type, 0)
 	if not fd then return nil, errm(eno, "socket") end
 	local r
-	local SOL_SOCKET = 0x00000001
-	local SO_KEEPALIVE = 0x00000009
+	local SOL_SOCKET = 1
+	local SO_KEEPALIVE = 9
 	r, eno = l5.setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, 1)
 	if not r then return nil, errm(eno, "setsockopt") end
 	r, eno = l5.bind(fd, sockaddr)
@@ -111,7 +121,7 @@ function sock.newdso(family)
 		dso.sa = sa
 		-- bind the socket to the address
 		r, eno = l5.bind(dso.fd, sa)
-		if not r then return nil, em end
+		if not r then return nil, errm(eno, "bind") end
 		return dso
 	end
 	--
@@ -121,11 +131,12 @@ function sock.newdso(family)
 	end
 	--
 	function dso.send(dso, str, dest, flags)
+		-- #str must be < sock.BUFSIZE1
 		flags = flags or 0
 		return l5.send1(dso.fd, str, flags, dest)
 	end
 	--
-	function dso.close(dso) l5.close(dso.fd) end
+	function dso.close(dso) return l5.close(dso.fd) end
 	--
 	dso.fd, em = sock.dsocket(dso.family)
 	if not dso.fd then return nil, em end

@@ -636,20 +636,24 @@ static int ll_connect(lua_State *L) {
 }
 
 static int ll_recvfrom(lua_State *L) {
-	// lua api: recvfrom(fd, buf, count, flags) => n, sockaddr
+	// lua api: recvfrom(fd, buf, count [, flags]) => n, sockaddr
 	// receive up to count bytes into buffer buf
 	// the buffer is a memory buffer object (mb) - see mbnew() above.
+	// flags defaults to 0.
 	// return number of read bytes or nil, errno
 	int fd = luaL_checkinteger(L, 1);
 	char *mb = lua_touserdata(L, 2);
 	int64_t size = lua_rawlen(L, 2);
 	int64_t count = luaL_checkinteger(L, 3);
 	if (count > size) LERR("out of range");
-	int flags = luaL_checkinteger(L, 4);
+	int flags = luaL_optinteger(L, 4, 0);
 	char addrbuf[256];
 	socklen_t addrbuflen = 256;
 	int n = recvfrom(fd, mb, count, flags, 
 		(struct sockaddr *) addrbuf, &addrbuflen);
+	// when DONTWAIT is used and there is nothing to read, return 0
+	if ((n == -1) && (errno == EAGAIN) && 
+		(flags & MSG_DONTWAIT) != 0) n = 0;
 	if (n == -1) RET_ERRNO;
 	lua_pushinteger(L, n);
 	lua_pushlstring(L, addrbuf, addrbuflen);
@@ -676,15 +680,16 @@ static int ll_sendto(lua_State *L) {
 // payload plus room for enveloppe, encryption, seq number, etc.)
 
 static int ll_recv1(lua_State *L) {
-	// lua api: recv1(fd, flags) => str, sockaddr
+	// lua api: recv1(fd [, flags]) => str, sockaddr
 	// receive up to a fixed number of bytes (BUFSIZE1=1280)
 	// flags is an OR of all the MSG_* flags defined in sys/socket.h
-	// an additional flag is IGNORE_SA=0x01000000. if it is set,
-	// recv() is used and sockaddr is not returned
+	// an additional flag is IGNORE_SA=0x01000000. If it is set,
+	// recv() is used and sockaddr is not returned.
+	// flags defaults to 0.
 	// return number of read bytes or nil, errno
 	int fd = luaL_checkinteger(L, 1);
 	char buf[BUFSIZE1];
-	int flags = luaL_checkinteger(L, 2);
+	int flags = luaL_optinteger(L, 2, 0);
 	char addrbuf[136];
 	socklen_t addrbuflen = 136;
 	int n;
@@ -695,6 +700,9 @@ static int ll_recv1(lua_State *L) {
 		n = recvfrom(fd, buf, BUFSIZE1, flags, 
 			(struct sockaddr *) addrbuf, &addrbuflen);
 	}
+	// when DONTWAIT is used and there is nothing to read, return 0
+	if ((n == -1) && (errno == EAGAIN) && 
+		(flags & MSG_DONTWAIT) != 0) n = 0;
 	if (n == -1) RET_ERRNO;
 	lua_pushlstring(L, buf, n);
 	if (ignoresa) {
