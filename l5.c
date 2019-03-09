@@ -696,7 +696,7 @@ static int ll_recv1(lua_State *L) {
 			(struct sockaddr *) addrbuf, &addrbuflen);
 	}
 	if (n == -1) RET_ERRNO;
-	lua_pushinteger(L, n);
+	lua_pushlstring(L, buf, n);
 	if (ignoresa) {
 		lua_pushlstring(L, addrbuf, addrbuflen);
 		return 2;
