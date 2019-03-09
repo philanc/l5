@@ -19,6 +19,8 @@
 #include <linux/dm-ioctl.h>	// dm ioctl
 #include <linux/loop.h>	// loop ioctl
 #include <sys/mount.h>	//  BLKGETSIZE64
+#include <sys/socket.h>	// socket..
+#include <sys/un.h>	// AF_UNIX socket
 
 
 #define dispint(x)	printf(#x " = %d\n", x);
@@ -131,8 +133,30 @@ void main() {
 	dispint(LO_NAME_SIZE)
 	dispint(LO_KEY_SIZE)
 	
+	// sockets
+	dispsize(struct sockaddr)
+	dispsize(struct sockaddr_un)
+	//~ dispsize(struct sockaddr_in)
+	//~ dispsize(struct sockaddr_in6)
+	dispsize(struct sockaddr_storage)
+	dispintx(AF_UNIX)
+	dispintx(AF_LOCAL)
+	dispintx(AF_INET)
+	dispintx(AF_INET6)
+	dispintx(SOCK_STREAM)
+	dispintx(SOCK_DGRAM)
+	dispintx(SOCK_SEQPACKET)
+	dispintx(SOCK_NONBLOCK)
+	dispintx(SOCK_CLOEXEC)
+	dispintx(SOL_SOCKET)
+	dispintx(SO_KEEPALIVE)
+	dispintx(MSG_DONTWAIT)
+	//~ dispintx()
+	
 	printf("---\n");
 }
+
+
 
 
 

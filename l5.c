@@ -56,6 +56,12 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 // default backlog for listen()
 #define BACKLOG 32
 
+// buffer size for send1, recv1
+#define BUFSIZE1 1280
+
+// flag for send1, recv1. indicate that the param sockaddr is not used
+#define IGNORE_SA 0x01000000
+
 // default timeout: 10 seconds  (poll, ...)
 #define DEFAULT_TIMEOUT 10000
 
@@ -641,18 +647,18 @@ static int ll_recvfrom(lua_State *L) {
 	if (count > size) LERR("out of range");
 	int flags = luaL_checkinteger(L, 4);
 	char addrbuf[256];
-	socklen_t addrbuflen;
+	socklen_t addrbuflen = 256;
 	int n = recvfrom(fd, mb, count, flags, 
-		(struct sockaddr *)&addrbuf, &addrbuflen);
+		(struct sockaddr *) addrbuf, &addrbuflen);
 	if (n == -1) RET_ERRNO;
-	lua_pushlstring(L, addrbuf, addrbuflen);
 	lua_pushinteger(L, n);
+	lua_pushlstring(L, addrbuf, addrbuflen);
 	return 2;
 }
 
 static int ll_sendto(lua_State *L) {
 	// lua api: sendto(fd, str, sockaddr)
-	// attempt to send string str at aaddress sockaddr
+	// attempt to send string str at address sockaddr
 	// return number of bytes actually sent, or nil, errno
 	int fd = luaL_checkinteger(L, 1);
 	int64_t len, count, salen;
@@ -661,6 +667,64 @@ static int ll_sendto(lua_State *L) {
 	struct sockaddr *sa = (struct sockaddr *)luaL_checklstring(
 		L, 4, &salen);	
 	int n = sendto(fd, str, len, flags, sa, salen);
+	if (n == -1) RET_ERRNO;
+	RET_INT(n);
+}
+
+// recv1, send1:  convenience functions for small datagrams (0 to ~1k)
+// the max size is BUFSIZE1=1280 (it is intended to be enough for 1024-byte
+// payload plus room for enveloppe, encryption, seq number, etc.)
+
+static int ll_recv1(lua_State *L) {
+	// lua api: recv1(fd, flags) => str, sockaddr
+	// receive up to a fixed number of bytes (BUFSIZE1=1280)
+	// flags is an OR of all the MSG_* flags defined in sys/socket.h
+	// an additional flag is IGNORE_SA=0x01000000. if it is set,
+	// recv() is used and sockaddr is not returned
+	// return number of read bytes or nil, errno
+	int fd = luaL_checkinteger(L, 1);
+	char buf[BUFSIZE1];
+	int flags = luaL_checkinteger(L, 2);
+	char addrbuf[136];
+	socklen_t addrbuflen = 136;
+	int n;
+	int ignoresa = (flags & IGNORE_SA);
+	if (ignoresa) {
+		n = recv(fd, buf, BUFSIZE1, flags);
+	} else {
+		n = recvfrom(fd, buf, BUFSIZE1, flags, 
+			(struct sockaddr *) addrbuf, &addrbuflen);
+	}
+	if (n == -1) RET_ERRNO;
+	lua_pushinteger(L, n);
+	if (ignoresa) {
+		lua_pushlstring(L, addrbuf, addrbuflen);
+		return 2;
+	} else {
+		return 1; 
+	}
+}
+
+static int ll_send1(lua_State *L) {
+	// lua api: sendto(fd, str, flags [, sockaddr])
+	// attempt to send string str at address sockaddr
+	// flags is an OR of all the MSG_* flags defined in sys/socket.h
+	// an additional flag is IGNORE_SA=0x01000000. if it is set,
+	// assume the socket is connected. sockaddr is not used.
+	// return number of bytes actually sent, or nil, errno
+	int fd = luaL_checkinteger(L, 1);
+	int64_t len, count, salen;
+	const char *str = luaL_checklstring(L, 2, &len);	
+	if (len > BUFSIZE1) LERR("out of range");
+	int flags = luaL_checkinteger(L, 3);
+	int n;
+	struct sockaddr *sa;
+	if (flags & IGNORE_SA) {
+		n = send(fd, str, len, flags);
+	} else {
+		sa = (struct sockaddr *)luaL_checklstring(L, 4, &salen);
+		n = sendto(fd, str, len, flags, sa, salen);
+	}
 	if (n == -1) RET_ERRNO;
 	RET_INT(n);
 }
@@ -763,7 +827,7 @@ int ll_getnameinfo(lua_State *L) {
 
 
 
-//------------------------------------------------------------
+//----------------------------------------------------------------------
 // lua library declaration
 //
 
@@ -819,6 +883,10 @@ static const struct luaL_Reg l5lib[] = {
 	{"listen", ll_listen},
 	{"accept", ll_accept},
 	{"connect", ll_connect},
+	{"recvfrom", ll_recvfrom},
+	{"sendto", ll_sendto},
+	{"recv1", ll_recv1},
+	{"send1", ll_send1},
 	{"getsockname", ll_getsockname},
 	{"getpeername", ll_getpeername},
 	{"getaddrinfo", ll_getaddrinfo},
