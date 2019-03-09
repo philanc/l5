@@ -19,6 +19,9 @@ local errm, rpad, pf, px = util.errm, util.rpad, util.pf, util.px
 
 sock = {}
 
+sock.DONTWAIT = 0x40  -- non-blocking flag for send/recv functions
+
+
 function sock.parse_ipv4_sockaddr(sockaddr)
 	-- return ipv4 address as a string and port as a number
 	-- or nil, errmsg if family is not AF_INET (2) or length is not 16
