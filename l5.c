@@ -698,10 +698,10 @@ static int ll_recv1(lua_State *L) {
 	if (n == -1) RET_ERRNO;
 	lua_pushlstring(L, buf, n);
 	if (ignoresa) {
+		return 1; 
+	} else {
 		lua_pushlstring(L, addrbuf, addrbuflen);
 		return 2;
-	} else {
-		return 1; 
 	}
 }
 
