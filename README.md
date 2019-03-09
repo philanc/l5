@@ -75,6 +75,12 @@ bind(fd, addr)
 listen(fd, backlog)
 accept(fd) => clientfd
 connect(fd, addr)
+recvfrom(fd, mb, flags) => n, sockaddr
+sendto(fb, str, flags, sockaddr) => n
+
+recv1(fd, flags) => str, sockaddr       -- convenience functions  
+send1(fd, str, flags [,sockaddr]) => n  -- for short datagrams
+
 getsockname(fd) => sockaddr
 getpeername(fd) => sockaddr
 getaddrinfo(host, port) => {sockaddr, ...}
