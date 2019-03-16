@@ -59,7 +59,7 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 // buffer size for send1, recv1
 #define BUFSIZE1 1280
 
-// flag for send1, recv1. indicate that the param sockaddr is not used
+// flag for recv1. indicate that the param sockaddr is not used
 #define IGNORE_SA 0x01000000
 
 // default timeout: 10 seconds  (poll, ...)
@@ -346,7 +346,7 @@ static int ll_write(lua_State *L) {
 	// lua api: write(fd, str [, idx, count])
 	// attempt to write count bytes in string str starting at 
 	// index 'idx'. count defaults to (#str-idx+1), idx defaults to 1, 
-	// ie. write(fd, str) attempts to write all bytes in str.
+	// so write(fd, str) attempts to write all bytes in str.
 	// return number of bytes actually written, or nil, errno
 	int fd = luaL_checkinteger(L, 1);
 	int64_t len, idx, count;
@@ -717,17 +717,17 @@ static int ll_send1(lua_State *L) {
 	// lua api: sendto(fd, str, flags [, sockaddr])
 	// attempt to send string str at address sockaddr
 	// flags is an OR of all the MSG_* flags defined in sys/socket.h
-	// an additional flag is IGNORE_SA=0x01000000. if it is set,
-	// assume the socket is connected. sockaddr is not used.
+	// if sockaddr is not provided, assume the socket is connected; 
+	// then send() is used instead of sendto().
 	// return number of bytes actually sent, or nil, errno
-	int fd = luaL_checkinteger(L, 1);
 	int64_t len, count, salen;
+	int n;
+	struct sockaddr *sa;
+	int fd = luaL_checkinteger(L, 1);
 	const char *str = luaL_checklstring(L, 2, &len);	
 	if (len > BUFSIZE1) LERR("out of range");
 	int flags = luaL_checkinteger(L, 3);
-	int n;
-	struct sockaddr *sa;
-	if (flags & IGNORE_SA) {
+	if (lua_isnoneornil(L, 4)) {
 		n = send(fd, str, len, flags);
 	} else {
 		sa = (struct sockaddr *)luaL_checklstring(L, 4, &salen);

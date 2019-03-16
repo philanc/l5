@@ -162,6 +162,7 @@ function test_5()  -- test sso objects
 	local soname, port = "127.0.0.1", 10000
 	local line, msg, mlen, l2, m2, ss, chs, cs, pid
 	line = "hello\n"
+	--line = "\n"
 	mlen = 5000	-- make msg larger than on read buffer
 	msg = ("m"):rep(mlen)
 	
