@@ -16,7 +16,7 @@ function util.px(s) -- hex dump the string s
 		if i%16==0 then io.write('') end
 		if i%32==0 then io.write('\n') end
 	end
-	io.write(strf("%02x\n", s:byte(i)))
+	io.write(strf("%02x\n", s:byte(#s)))
 end
 
 function util.repr(x) return string.format('%q', x) end
