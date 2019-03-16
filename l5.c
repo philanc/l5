@@ -46,9 +46,30 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 #define RET_STRN(s, slen) return (lua_pushlstring (L, (s), (slen)), 1)
 #define RET_STRZ(s) return (lua_pushstring (L, (s)), 1)
 
-//~ typedef unsigned char u8;
-//~ typedef unsigned long u32;
-//~ typedef unsigned long long u64;
+// the following functions are intended to simplify returning values
+// and optimize code size in common cases:
+//	int n = some_func(args)
+//	if (n == -1) RET_ERRNO; else RET_TRUE;
+// can be replaced with:
+//	return int_or_errno(L, some_func(args));
+// and
+//	if (n == -1) RET_ERRNO;
+// can be replaced with:
+//	if (n == -1) return nil_errno(L);
+
+
+static int nil_errno(lua_State *L) {
+	lua_pushnil(L);
+	lua_pushinteger(L, errno);
+	return 2;
+}
+
+static int int_or_errno(lua_State *L, int n) {
+	if (n == -1) return nil_errno(L);
+	lua_pushinteger(L, n);
+	return 1;
+}
+
 
 
 // API constants
@@ -182,22 +203,20 @@ static int ll_errno(lua_State *L) {
 static int ll_getcwd(lua_State *L) { 
 	char buf[4096];
 	char *p = getcwd(buf, 4096);
-	if (p == NULL) RET_ERRNO; else RET_STRZ(p);
+	if (p == NULL) return nil_errno(L); else RET_STRZ(p);
 }
 
 static int ll_chdir(lua_State *L) {
-	int r = chdir(luaL_checkstring(L, 1));
-	if (r == -1) RET_ERRNO; else RET_TRUE;
+	return int_or_errno(L, chdir(luaL_checkstring(L, 1)));
 }
 
 static int ll_setenv(lua_State *L) {
-	int r = setenv(luaL_checkstring(L, 1), luaL_checkstring(L, 2), 1);
-	if (r == -1) RET_ERRNO; else RET_TRUE;
+	return int_or_errno(L, 
+		setenv(luaL_checkstring(L, 1), luaL_checkstring(L, 2), 1));
 }
 
 static int ll_unsetenv(lua_State *L) {
-	int r = unsetenv(luaL_checkstring(L, 1));
-	if (r == -1) RET_ERRNO; else RET_TRUE;
+	return int_or_errno(L, unsetenv(luaL_checkstring(L, 1)));
 }
 
 static int ll_environ(lua_State *L) {
@@ -222,18 +241,14 @@ static int ll_msleep(lua_State *L) {
 	struct timespec req;
 	req.tv_sec = ms / 1000;
 	req.tv_nsec = (ms % 1000) * 1000000;
-	int n = nanosleep(&req, NULL);
-	if (n == -1) RET_ERRNO;
-	RET_TRUE;
+	return int_or_errno(L, nanosleep(&req, NULL));
 }
 
 static int ll_fork(lua_State *L) {
 	// fork the current process (fork(2))
 	// lua api: fork() => pid | nil, errno
 	// pid in the parent: pid of the child, in the child: 0
-	int pid = fork();
-	if (pid == -1) RET_ERRNO; 
-	RET_INT(pid);
+	return int_or_errno(L, fork());
 }
 
 static int ll_waitpid(lua_State *L) {
@@ -252,7 +267,7 @@ static int ll_waitpid(lua_State *L) {
 	int pid = luaL_optinteger(L, 1, -1);
 	int opt = luaL_optinteger(L, 2, 0);
 	pid = waitpid(pid, &status, opt);
-	if (pid == -1) RET_ERRNO; 
+	if (pid == -1) return nil_errno(L); 
 	lua_pushinteger(L, pid);
 	lua_pushinteger(L, status);
 	return 2;
@@ -260,8 +275,8 @@ static int ll_waitpid(lua_State *L) {
 
 static int ll_kill(lua_State *L) {
 	// lua api:  kill(pid, signal)
-	int r = kill(luaL_checkinteger(L, 1), luaL_checkinteger(L, 2));
-	if (r == -1) RET_ERRNO; else RET_TRUE;
+	return int_or_errno(L, 
+		kill(luaL_checkinteger(L, 1), luaL_checkinteger(L, 2)));
 }
 
 static int ll_execve(lua_State *L) {
@@ -289,7 +304,7 @@ static int ll_execve(lua_State *L) {
 	}
 	envp[envplen] = NULL;
 	execve(pname, (char **)argv, (char **)envp);
-	RET_ERRNO; // execve returns only on error
+	return nil_errno(L); // execve returns only on error
 }
 
 //----------------------------------------------------------------------
@@ -299,15 +314,12 @@ static int ll_open(lua_State *L) {
 	const char *pname = luaL_checkstring(L, 1);
 	int flags = luaL_checkinteger(L, 2);
 	mode_t mode = luaL_checkinteger(L, 3);
-	int r = open(pname, flags, mode);
-	if (r == -1) RET_ERRNO; 
-	RET_INT(r);
+	return int_or_errno(L, open(pname, flags, mode));
 }
 
 static int ll_close(lua_State *L) {
 	int fd = luaL_checkinteger(L, 1);
-	int r = close(fd);
-	if (r == -1) RET_ERRNO; else RET_TRUE;
+	return int_or_errno(L, close(fd));
 }
 
 static int ll_read(lua_State *L) {
@@ -322,13 +334,11 @@ static int ll_read(lua_State *L) {
 	int64_t count = luaL_checkinteger(L, 3);
 	int64_t offset = luaL_optinteger(L, 4, 0);
 	if (offset + count > size) LERR("out of range");
-	int n = read(fd, mb + offset, count);
-	if (n == -1) RET_ERRNO;
-	RET_INT(n);
+	return int_or_errno(L, read(fd, mb + offset, count));
 }
 
 static int ll_read4k(lua_State *L) { 
-	// lua api:  read4k(fd) => readbytes
+	// lua api:  read4k(fd) => str
 	// attempt to read 4,096 bytes (ie. 4kb)
 	// return read bytes as a string or nil, errno
 	//
@@ -338,12 +348,13 @@ static int ll_read4k(lua_State *L) {
 	char buf[4096];
 	int fd = luaL_checkinteger(L, 1);
 	int n = read(fd, buf, 4096);
-	if (n == -1) RET_ERRNO;
+	if (n == -1) return nil_errno(L);
 	RET_STRN(buf, n);
+	
 }
 
 static int ll_write(lua_State *L) {
-	// lua api: write(fd, str [, idx, count])
+	// lua api: write(fd, str [, idx, count]) => n
 	// attempt to write count bytes in string str starting at 
 	// index 'idx'. count defaults to (#str-idx+1), idx defaults to 1, 
 	// so write(fd, str) attempts to write all bytes in str.
@@ -355,9 +366,7 @@ static int ll_write(lua_State *L) {
 	count = len + idx - 1;
 	count = luaL_optinteger(L, 4, count);
 	if ((idx < 1) || (idx + count - 1 > len)) LERR("out of range");
-	int n = write(fd, str + idx - 1, count);
-	if (n == -1) RET_ERRNO;
-	RET_INT(n);
+	return int_or_errno(L, write(fd, str + idx - 1, count));
 }
 
 static int ll_dup2(lua_State *L) {
@@ -367,8 +376,7 @@ static int ll_dup2(lua_State *L) {
 	int newfd = luaL_optinteger(L, 2, -1);
 	if (newfd == -1) newfd = dup(oldfd);
 	else newfd = dup2(oldfd, newfd);
-	if (newfd == -1) RET_ERRNO;
-	RET_INT(newfd);
+	return int_or_errno(L, newfd);
 }
 
 //----------------------------------------------------------------------
@@ -380,7 +388,7 @@ static int ll_dup2(lua_State *L) {
 static int ll_opendir(lua_State *L) {
 	// lua api: opendir(pathname) => dirhandle (lightuserdata)
 	DIR *dp = opendir(luaL_checkstring(L, 1));
-	if (dp == NULL) RET_ERRNO;
+	if (dp == NULL) return nil_errno(L);
 	lua_pushlightuserdata(L, dp);
 	return 1; 
 }
@@ -391,7 +399,7 @@ static int ll_readdir(lua_State *L) {
 	DIR *dp = lua_touserdata(L, 1);
 	errno = 0;
 	struct dirent *p = readdir(dp);
-	if (p == NULL) RET_ERRNO;
+	if (p == NULL) return nil_errno(L);
 	char *name = p->d_name;
 	unsigned short type = p->d_type;
 	lua_pushstring (L, name);
@@ -402,15 +410,14 @@ static int ll_readdir(lua_State *L) {
 static int ll_closedir(lua_State *L) {
 	// lua api: closedir(dh)
 	DIR *dp = lua_touserdata(L, 1);
-	int r = closedir(dp);
-	if (r == -1) RET_ERRNO; else RET_TRUE;
+	return int_or_errno(L, closedir(dp));
 }
 
 static int ll_readlink(lua_State *L) { 
 	char buf[4096];
 	const char *pname = luaL_checkstring(L, 1);
 	int n = readlink(pname, buf, 4096);
-	if (n == -1) RET_ERRNO; 
+	if (n == -1) return nil_errno(L); 
 	RET_STRN(buf, n);
 }
 
@@ -424,7 +431,7 @@ static int ll_lstat3(lua_State *L) {
 	lua_Integer statflag = luaL_optinteger(L, 2, 0);
 	if (statflag != 0) r = stat(pname, &buf);
 	else r = lstat(pname, &buf);
-	if (r == -1) RET_ERRNO; 
+	if (r == -1) return nil_errno(L); 
 	lua_pushinteger(L, buf.st_mode);
 	lua_pushinteger(L, buf.st_size);
 	lua_pushinteger(L, buf.st_mtim.tv_sec);
@@ -446,7 +453,7 @@ static int ll_lstat(lua_State *L) {
 	lua_Integer statflag = luaL_optinteger(L, 3, 0);
 	if (statflag != 0) r = stat(pname, &buf);
 	else r = lstat(pname, &buf);
-	if (r == -1) RET_ERRNO; 
+	if (r == -1) return nil_errno(L); 
 	lua_pushvalue(L, 2); // ensure tbl is top of stack - set values:
 	lua_pushinteger(L, buf.st_dev); lua_rawseti(L, -2, 1);
 	lua_pushinteger(L, buf.st_ino); lua_rawseti(L, -2, 2);
@@ -469,21 +476,18 @@ static int ll_symlink(lua_State *L) {
 	//
 	const char *target = luaL_checkstring(L, 1);
 	const char *linkpath = luaL_checkstring(L, 2);
-	int n = symlink(target, linkpath);
-	if (n == -1) RET_ERRNO; else RET_TRUE;	
+	return int_or_errno(L, symlink(target, linkpath));
 }
 
 static int ll_mkdir(lua_State *L) {
 	const char *pname = luaL_checkstring(L, 1);
 	int mode = luaL_optinteger(L, 2, 0);
-	int n = mkdir(pname, mode);
-	if (n == -1) RET_ERRNO; else RET_TRUE;	
+	return int_or_errno(L, mkdir(pname, mode));
 }
 
 static int ll_rmdir(lua_State *L) { 
 	const char *pname = luaL_checkstring(L, 1);
-	int n = rmdir(pname);
-	if (n == -1) RET_ERRNO; else RET_TRUE;
+	return int_or_errno(L, rmdir(pname));
 }
 
 
@@ -496,16 +500,14 @@ static int ll_mount(lua_State *L) {
 	const char *fstype = luaL_checkstring(L, 3);
 	int flags = luaL_checkinteger(L, 4);
 	const char *data = luaL_checkstring(L, 5);
-	int r = mount(src, dest, fstype, flags, data);
-	if (r == -1) RET_ERRNO; else RET_TRUE;
+	return int_or_errno(L, mount(src, dest, fstype, flags, data));
 }
 
 static int ll_umount(lua_State *L) {
 	// lua api: umount(dest) => true | nil, errno
 	// dest is a string
 	const char *dest = luaL_checkstring(L, 1);
-	int r = umount(dest);
-	if (r == -1) RET_ERRNO; else RET_TRUE;
+	return int_or_errno(L, umount(dest));
 }
 
 
@@ -524,7 +526,7 @@ static int ll_ioctl(lua_State *L) {
 	if (argoutlen > IOCTLBUFLEN) LERR("ioctl: argoutlen too large");
 	if (arglen > 0) memcpy(buf, arg, arglen);
 	int r = ioctl(fd, cmd, buf);
-	if (r == -1) RET_ERRNO; 
+	if (r == -1) return nil_errno(L); 
 	if (argoutlen > 0) { RET_STRN(buf, argoutlen); }
 	RET_TRUE;
 }
@@ -534,8 +536,7 @@ static int ll_ioctl_int(lua_State *L) {
 	int fd = luaL_checkinteger(L, 1);
 	int cmd = luaL_checkinteger(L, 2);
 	long arg = luaL_checkinteger(L, 3);
-	int r = ioctl(fd, cmd, arg);
-	if (r == -1) RET_ERRNO; else RET_INT(r);
+	return int_or_errno(L, ioctl(fd, cmd, arg));
 }
 
 static int ll_poll(lua_State *L) {
@@ -550,9 +551,7 @@ static int ll_poll(lua_State *L) {
 	if (nfds * 8 <= size) LERR("out of range");
 	int timeout = luaL_optinteger(L, 3, DEFAULT_TIMEOUT); 
 	struct pollfd *pfd = (struct pollfd *)mb;
-	int n = poll(pfd, nfds, timeout);
-	if (n < 0) RET_ERRNO;
-	RET_INT(n);
+	return int_or_errno(L, poll(pfd, nfds, timeout));
 }
 
 static int ll_pollin(lua_State *L) {
@@ -568,9 +567,7 @@ static int ll_pollin(lua_State *L) {
 	pfd.fd = fd;
 	pfd.events = POLLIN;
 	pfd.revents = 0;
-	int n = poll(&pfd, (nfds_t) 1, timeout);
-	if (n < 0) RET_ERRNO;
-	RET_INT(n);
+	return int_or_errno(L, poll(&pfd, (nfds_t) 1, timeout));
 }
 
 //----------------------------------------------------------------------
@@ -581,9 +578,7 @@ static int ll_socket(lua_State *L) {
 	int domain = luaL_checkinteger(L, 1);
 	int sotype = luaL_checkinteger(L, 2);
 	int protocol = luaL_checkinteger(L, 3);
-	int fd = socket(domain, sotype, protocol);
-	if (fd < 0) RET_ERRNO;
-	RET_INT(fd);	
+	return int_or_errno(L, socket(domain, sotype, protocol));
 }
 
 static int ll_setsockopt(lua_State *L) {
@@ -592,8 +587,8 @@ static int ll_setsockopt(lua_State *L) {
 	int level = luaL_checkinteger(L, 2);
 	int optname = luaL_checkinteger(L, 3);
 	int optvalue = luaL_checkinteger(L, 4);
-	int r = setsockopt(fd, level, optname, &optvalue, sizeof(optvalue));
-	if (r < 0) RET_ERRNO; else RET_TRUE;
+	return int_or_errno(L, setsockopt(
+		fd, level, optname, &optvalue, sizeof(optvalue)));
 }
 
 // will add a ll_setsockopt_str() to set option with 
@@ -604,16 +599,15 @@ static int ll_bind(lua_State *L) {
 	int fd = luaL_checkinteger(L, 1);
 	size_t len;
 	const char *addr = luaL_checklstring(L, 2, &len);
-	int r = bind(fd, (const struct sockaddr *)addr, len);
-	if (r < 0) RET_ERRNO; else RET_TRUE;
+	return int_or_errno(L, 
+		bind(fd, (const struct sockaddr *)addr, len));
 }
 
 static int ll_listen(lua_State *L) {
 	// lua api: listen(fd, backlog)
 	int fd = luaL_checkinteger(L, 1);
 	int backlog = luaL_optinteger(L, 2, BACKLOG);
-	int r = listen(fd, backlog);
-	if (r < 0) RET_ERRNO; else RET_TRUE;
+	return int_or_errno(L, listen(fd, backlog));
 }
 
 static int ll_accept(lua_State *L) {
@@ -621,9 +615,7 @@ static int ll_accept(lua_State *L) {
 	int fd = luaL_checkinteger(L, 1);
 	struct sockaddr addr;
 	socklen_t len = sizeof(addr); //enough for ip4&6 addr
-	int cfd = accept(fd, &addr, &len);
-	if (cfd < 0) RET_ERRNO;
-	RET_INT(cfd);
+	return int_or_errno(L, accept(fd, &addr, &len));
 }
 
 static int ll_connect(lua_State *L) {
@@ -631,8 +623,8 @@ static int ll_connect(lua_State *L) {
 	int fd = luaL_checkinteger(L, 1);
 	size_t len;
 	const char *addr = luaL_checklstring(L, 2, &len);
-	int r = connect(fd, (const struct sockaddr *)addr, len);
-	if (r < 0) RET_ERRNO; else RET_TRUE;
+	return int_or_errno(L, 
+		connect(fd, (const struct sockaddr *)addr, len));
 }
 
 static int ll_recvfrom(lua_State *L) {
@@ -654,7 +646,7 @@ static int ll_recvfrom(lua_State *L) {
 	// when DONTWAIT is used and there is nothing to read, return 0
 	if ((n == -1) && (errno == EAGAIN) && 
 		(flags & MSG_DONTWAIT) != 0) n = 0;
-	if (n == -1) RET_ERRNO;
+	if (n == -1) return nil_errno(L);
 	lua_pushinteger(L, n);
 	lua_pushlstring(L, addrbuf, addrbuflen);
 	return 2;
@@ -670,9 +662,7 @@ static int ll_sendto(lua_State *L) {
 	int flags = luaL_checkinteger(L, 3);
 	struct sockaddr *sa = (struct sockaddr *)luaL_checklstring(
 		L, 4, &salen);	
-	int n = sendto(fd, str, len, flags, sa, salen);
-	if (n == -1) RET_ERRNO;
-	RET_INT(n);
+	return int_or_errno(L, sendto(fd, str, len, flags, sa, salen));
 }
 
 // recv1, send1:  convenience functions for small datagrams (0 to ~1k)
@@ -703,7 +693,7 @@ static int ll_recv1(lua_State *L) {
 	// when DONTWAIT is used and there is nothing to read, return 0
 	if ((n == -1) && (errno == EAGAIN) && 
 		(flags & MSG_DONTWAIT) != 0) n = 0;
-	if (n == -1) RET_ERRNO;
+	if (n == -1) return nil_errno(L);
 	lua_pushlstring(L, buf, n);
 	if (ignoresa) {
 		return 1; 
@@ -733,8 +723,7 @@ static int ll_send1(lua_State *L) {
 		sa = (struct sockaddr *)luaL_checklstring(L, 4, &salen);
 		n = sendto(fd, str, len, flags, sa, salen);
 	}
-	if (n == -1) RET_ERRNO;
-	RET_INT(n);
+	return int_or_errno(L, n);
 }
 
 
@@ -746,7 +735,7 @@ static int ll_getsockname(lua_State *L) {
 	struct sockaddr addr;
 	socklen_t len = sizeof(addr); //enough for ip4&6 addr
 	int n = getsockname(fd, &addr, &len);
-	if (n == -1) RET_ERRNO;
+	if (n == -1) return nil_errno(L);
 	RET_STRN((char *)&addr, len);
 }
 	
@@ -758,7 +747,7 @@ static int ll_getpeername(lua_State *L) {
 	struct sockaddr addr;
 	socklen_t len = sizeof(addr); //enough for ip4&6 addr
 	int n = getsockname(fd, &addr, &len);
-	if (n == -1) RET_ERRNO;
+	if (n == -1) return nil_errno(L);
 	RET_STRN((char *)&addr, len);
 }
 
@@ -819,15 +808,6 @@ int ll_getnameinfo(lua_State *L) {
 	lua_pushstring(L, serv);
 	return 2;	
 }
-
-		
-	
-	
-	
-
-
-
-
 
 
 
