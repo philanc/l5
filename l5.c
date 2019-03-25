@@ -492,14 +492,16 @@ static int ll_rmdir(lua_State *L) {
 
 
 static int ll_mount(lua_State *L) {
-	// lua api: mount(src, dest, fstype, flags, data)
+	// lua api: mount(src, dest, fstype [, flags, data])
 	// src, dest, fstype and data are strings, flags is int.
+	// flags is optional. default value is 0 (rw).
+	// data is optional. defualt value is an empty string.
 	// return true or nil, errno
 	const char *src = luaL_checkstring(L, 1);
 	const char *dest = luaL_checkstring(L, 2);
 	const char *fstype = luaL_checkstring(L, 3);
-	int flags = luaL_checkinteger(L, 4);
-	const char *data = luaL_checkstring(L, 5);
+	int flags = luaL_optinteger(L, 4, 0);
+	const char *data = luaL_optstring(L, 5, "");
 	return int_or_errno(L, mount(src, dest, fstype, flags, data));
 }
 

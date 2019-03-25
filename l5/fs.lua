@@ -191,15 +191,19 @@ function fs.stat3(fpath)
 end
 	
 
-	
+-- some useful mount options
+
+fs.mount_options = {
+	ro = 1,
+	nosuid = 2,
+	nodev = 4,
+	noexec = 8,
+	remount = 32,
+	noatime = 1024,
+	bind = 4096,
+}
 
 
-
-
-
-
-
-	
 
 
 ------------------------------------------------------------------------
