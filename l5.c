@@ -8,7 +8,7 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 
 */
 
-#define L5_VERSION "L5-0.1"
+#define L5_VERSION "L5-0.2"
 
 #include <stdlib.h>	// setenv
 #include <stdio.h>
@@ -77,8 +77,8 @@ static int int_or_errno(lua_State *L, int n) {
 // default backlog for listen()
 #define BACKLOG 32
 
-// buffer size for send1, recv1
-#define BUFSIZE1 1280
+// buffer size for recv, recvfrom, read
+#define BUFSIZE 4096
 
 // flag for recv1. indicate that the param sockaddr is not used
 #define IGNORE_SA 0x01000000
@@ -322,35 +322,15 @@ static int ll_close(lua_State *L) {
 	return int_or_errno(L, close(fd));
 }
 
-static int ll_read(lua_State *L) {
-	// lua api: read(fd, buf, count [, offset])
-	// attempt to read up to count bytes into buffer buf
-	// read bytes are stored in buffer at offset (defaults to 0)
-	// the buffer is a memory buffer object (mb) - see mbnew() above.
-	// return number of read bytes or nil, errno
-	int fd = luaL_checkinteger(L, 1);
-	char *mb = lua_touserdata(L, 2);
-	int64_t size = lua_rawlen(L, 2);
-	int64_t count = luaL_checkinteger(L, 3);
-	int64_t offset = luaL_optinteger(L, 4, 0);
-	if (offset + count > size) LERR("out of range");
-	return int_or_errno(L, read(fd, mb + offset, count));
-}
-
-static int ll_read4k(lua_State *L) { 
-	// lua api:  read4k(fd) => str
-	// attempt to read 4,096 bytes (ie. 4kb)
+static int ll_read(lua_State *L) { 
+	// lua api:  read(fd) => str
+	// attempt to read BUFSIZE (4,096) bytes (ie. 4kb)
 	// return read bytes as a string or nil, errno
-	//
-	//--- KEEP IT??  --- can be implemented with a unique mb buffer:
-	// mb=mbnew(4096); n=read(fd, mb, 4096); return mb:get(1, n)
-	//
-	char buf[4096];
+	char buf[BUFSIZE];
 	int fd = luaL_checkinteger(L, 1);
-	int n = read(fd, buf, 4096);
+	int n = read(fd, buf, BUFSIZE);
 	if (n == -1) return nil_errno(L);
 	RET_STRN(buf, n);
-	
 }
 
 static int ll_write(lua_State *L) {
@@ -513,7 +493,6 @@ static int ll_umount(lua_State *L) {
 }
 
 
-// how to ensure it's enough? --- rewrite with a mb?
 #define IOCTLBUFLEN 1024
 
 static int ll_ioctl(lua_State *L) {
@@ -630,82 +609,46 @@ static int ll_connect(lua_State *L) {
 }
 
 static int ll_recvfrom(lua_State *L) {
-	// lua api: recvfrom(fd, buf, count [, flags]) => n, sockaddr
-	// receive up to count bytes into buffer buf
-	// the buffer is a memory buffer object (mb) - see mbnew() above.
+	// lua api: recvfrom(fd [, flags]) => str, sockaddr
+	// receive up to BUFSIZE bytes (4,096 bytes)
+	// return received bytes and sender sockaddr as strings or nil, errno
+	// flags is an OR of all the MSG_* flags defined in sys/socket.h
 	// flags defaults to 0.
-	// return number of read bytes or nil, errno
 	int fd = luaL_checkinteger(L, 1);
-	char *mb = lua_touserdata(L, 2);
-	int64_t size = lua_rawlen(L, 2);
-	int64_t count = luaL_checkinteger(L, 3);
-	if (count > size) LERR("out of range");
-	int flags = luaL_optinteger(L, 4, 0);
-	char addrbuf[256];
-	socklen_t addrbuflen = 256;
-	int n = recvfrom(fd, mb, count, flags, 
+	char buf[BUFSIZE];
+	int flags = luaL_optinteger(L, 2, 0);
+	char addrbuf[136];
+	socklen_t addrbuflen = 136;
+	int n = recvfrom(fd, buf, BUFSIZE, flags, 
 		(struct sockaddr *) addrbuf, &addrbuflen);
 	// when DONTWAIT is used and there is nothing to read, return 0
 	if ((n == -1) && (errno == EAGAIN) && 
 		(flags & MSG_DONTWAIT) != 0) n = 0;
 	if (n == -1) return nil_errno(L);
-	lua_pushinteger(L, n);
+	lua_pushlstring(L, buf, n);
 	lua_pushlstring(L, addrbuf, addrbuflen);
 	return 2;
 }
 
-static int ll_sendto(lua_State *L) {
-	// lua api: sendto(fd, str, sockaddr)
-	// attempt to send string str at address sockaddr
-	// return number of bytes actually sent, or nil, errno
-	int fd = luaL_checkinteger(L, 1);
-	int64_t len, count, salen;
-	const char *str = luaL_checklstring(L, 2, &len);	
-	int flags = luaL_checkinteger(L, 3);
-	struct sockaddr *sa = (struct sockaddr *)luaL_checklstring(
-		L, 4, &salen);	
-	return int_or_errno(L, sendto(fd, str, len, flags, sa, salen));
-}
-
-// recv1, send1:  convenience functions for small datagrams (0 to ~1k)
-// the max size is BUFSIZE1=1280 (it is intended to be enough for 1024-byte
-// payload plus room for enveloppe, encryption, seq number, etc.)
-
-static int ll_recv1(lua_State *L) {
-	// lua api: recv1(fd [, flags]) => str, sockaddr
-	// receive up to a fixed number of bytes (BUFSIZE1=1280)
+static int ll_recv(lua_State *L) {
+	// lua api: recv(fd [, flags]) => str
+	// receive up to BUFSIZE bytes (4,096 bytes)
+	// return received bytes as a string or nil, errno
 	// flags is an OR of all the MSG_* flags defined in sys/socket.h
-	// an additional flag is IGNORE_SA=0x01000000. If it is set,
-	// recv() is used and sockaddr is not returned.
 	// flags defaults to 0.
-	// return number of read bytes or nil, errno
 	int fd = luaL_checkinteger(L, 1);
-	char buf[BUFSIZE1];
+	char buf[BUFSIZE];
 	int flags = luaL_optinteger(L, 2, 0);
-	char addrbuf[136];
-	socklen_t addrbuflen = 136;
-	int n;
-	int ignoresa = (flags & IGNORE_SA);
-	if (ignoresa) {
-		n = recv(fd, buf, BUFSIZE1, flags);
-	} else {
-		n = recvfrom(fd, buf, BUFSIZE1, flags, 
-			(struct sockaddr *) addrbuf, &addrbuflen);
-	}
+	int n = recv(fd, buf, BUFSIZE, flags);
 	// when DONTWAIT is used and there is nothing to read, return 0
 	if ((n == -1) && (errno == EAGAIN) && 
 		(flags & MSG_DONTWAIT) != 0) n = 0;
 	if (n == -1) return nil_errno(L);
 	lua_pushlstring(L, buf, n);
-	if (ignoresa) {
-		return 1; 
-	} else {
-		lua_pushlstring(L, addrbuf, addrbuflen);
-		return 2;
-	}
+	return 1; 
 }
 
-static int ll_send1(lua_State *L) {
+static int ll_sendto(lua_State *L) {
 	// lua api: sendto(fd, str, flags [, sockaddr])
 	// attempt to send string str at address sockaddr
 	// flags is an OR of all the MSG_* flags defined in sys/socket.h
@@ -717,7 +660,6 @@ static int ll_send1(lua_State *L) {
 	struct sockaddr *sa;
 	int fd = luaL_checkinteger(L, 1);
 	const char *str = luaL_checklstring(L, 2, &len);	
-	if (len > BUFSIZE1) LERR("out of range");
 	int flags = luaL_checkinteger(L, 3);
 	if (lua_isnoneornil(L, 4)) {
 		n = send(fd, str, len, flags);
@@ -846,7 +788,6 @@ static const struct luaL_Reg l5lib[] = {
 	{"open", ll_open},
 	{"close", ll_close},
 	{"read", ll_read},
-	{"read4k", ll_read4k},
 	{"write", ll_write},
 	{"dup2", ll_dup2},
 	//
@@ -874,9 +815,8 @@ static const struct luaL_Reg l5lib[] = {
 	{"accept", ll_accept},
 	{"connect", ll_connect},
 	{"recvfrom", ll_recvfrom},
+	{"recv", ll_recv},
 	{"sendto", ll_sendto},
-	{"recv1", ll_recv1},
-	{"send1", ll_send1},
 	{"getsockname", ll_getsockname},
 	{"getpeername", ll_getpeername},
 	{"getaddrinfo", ll_getaddrinfo},

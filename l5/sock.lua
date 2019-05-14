@@ -160,13 +160,13 @@ function sock.newdso(family)
 	--
 	function dso.recv(dso, flags)
 		flags = flags or 0
-		return l5.recv1(dso.fd, flags)
+		return l5.recv(dso.fd, flags)
 	end
 	--
 	function dso.send(dso, str, dest, flags)
 		-- #str must be < sock.BUFSIZE1
 		flags = flags or 0
-		return l5.send1(dso.fd, str, flags, dest)
+		return l5.send(dso.fd, str, flags, dest)
 	end
 	--
 	function dso.close(dso) return l5.close(dso.fd) end
@@ -217,7 +217,7 @@ function sock.newsso(fd)
 				sso.bi = j + 1
 				return l
 			else -- NL not found. read more bytes into buf
-				local b, eno = l5.read4k(sso.fd)
+				local b, eno = l5.read(sso.fd)
 				if not b then 
 					return nil, errm(eno, "read") 
 				end
@@ -252,7 +252,7 @@ function sock.newsso(fd)
 				sso.bi = 1
 				return nbs
 			else -- not enough, read more
-				local b, eno = l5.read4k(sso.fd)
+				local b, eno = l5.read(sso.fd)
 				if not b then 
 					return nil, errm(eno, "read")
 				end

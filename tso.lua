@@ -21,16 +21,16 @@ function test_1()
 	local a, ab, fd, eno, em, em2, r, n, mb, msg, msg2
 	soname = "./aaa"
 	os.remove(soname)
-	mb = l5.mbnew(1400)
+--~ 	mb = l5.mbnew(1400)
 	fd = assert(sock.dsocket(1))
 	a = sock.make_unix_sockaddr(soname)
 --~ 	print("sockaddr:", repr(a), #a)
 	assert(l5.bind(fd, a))
 	msg = "hello-1"
 	assert(l5.sendto(fd, msg, 0, a))
-	r, ab = l5.recvfrom(fd, mb, 1400, 0)
+	r, ab = l5.recvfrom(fd)
 	assert(a == ab)
-	msg2 = mb:get(0, r)
+	msg2 = r
 	assert(msg2 == msg)
 --~ 	print("recvfrom", repr(ab), #ab, r, repr(msg2))
 	l5.close(fd)
@@ -63,7 +63,7 @@ function test_2()
 	local a, ab, fd, eno, em, em2, r, n, mb, msg, msg2
 	soname = "./aaa"
 	os.remove(soname)
-	mb = l5.mbnew(1400)
+--~ 	mb = l5.mbnew(1400)
 	fd = assert(sock.dsocket(1))
 	a = sock.make_unix_sockaddr(soname)
 --~ 	print("sockaddr:", repr(a), #a)
@@ -73,7 +73,7 @@ function test_2()
 	assert(r, errm(eno, "connect"))
 	r, eno = l5.write(fd, msg)
 	assert(r, errm(eno, "write"))
-	r, eno = l5.read4k(fd)
+	r, eno = l5.read(fd)
 	assert(r, errm(eno, "read"))
 	print("read:", r)
 --~ 	msg2 = mb:get(0, r)
@@ -205,9 +205,9 @@ end
 
 ------------------------------------------------------------------------
 
---~ test_1()
+test_1()
 --~ test_1a()
---~ test_2()
+test_2()
 --~ test_2a()
 --~ test_3()
 --~ test_3a()
