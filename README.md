@@ -44,8 +44,7 @@ kill(pid, sig)
 execve(pname, argv, envp)
 
 open() => fd
-read(fd, buf [, offset, count]) => n
-read4k(fd) => str  --read 4 kbytes
+read(fd) => str  --(read up to 4 kbytes)
 write(fd, str [, idx, count]) => n
 close(fd)
 dup2(oldfd [, newfd]) => newfd
@@ -75,11 +74,9 @@ bind(fd, addr)
 listen(fd, backlog)
 accept(fd) => clientfd
 connect(fd, addr)
-recvfrom(fd, mb, flags) => n, sockaddr
+recvfrom(fd, flags) => str, sockaddr
+recv(fd, flags) => str
 sendto(fb, str, flags, sockaddr) => n
-
-recv1(fd, flags) => str, sockaddr       -- convenience functions  
-send1(fd, str, flags [,sockaddr]) => n  -- for short datagrams
 
 getsockname(fd) => sockaddr
 getpeername(fd) => sockaddr
