@@ -188,7 +188,7 @@ function sock.newsso(fd)
 	--
 	function sso.timeout(sso, ms)
 		local r, eno = l5.setsocktimeout(sso.fd, ms)
-		if not r then return nil, errm(eno, "accept") end
+		if not r then return nil, errm(eno, "setsocktimeout") end
 		return sso
 	end
 	--
