@@ -84,11 +84,13 @@ function sock.make_sockaddr(addr, port)
 	end
 end
 
-function sock.sbind(addr, port)
+function sock.sbind(addr, port, backlog)
 	-- create a stream socket, bind it, and start listening
 	-- socket is ipv4, or unix if port is empty
 	-- default options: CLOEXEC, blocking, REUSEADDR
+	-- backlog is the backlog size for listen(). it defaults to 32.
 	-- return the socket fd, or nil, errmsg
+	backlog = backlog or 32
 	local sockaddr, em = sock.make_sockaddr(addr, port)
 	if not sockaddr then return nil, em end
 	local family = port and 2 or 1
