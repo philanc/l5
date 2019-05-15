@@ -563,7 +563,7 @@ static int ll_socket(lua_State *L) {
 }
 
 static int ll_setsockopt(lua_State *L) {
-	// lua api: setsockopt_int(fd, level, optname, intvalue)
+	// lua api: setsockopt(fd, level, optname, intvalue)
 	int fd = luaL_checkinteger(L, 1);
 	int level = luaL_checkinteger(L, 2);
 	int optname = luaL_checkinteger(L, 3);
@@ -574,6 +574,26 @@ static int ll_setsockopt(lua_State *L) {
 
 // will add a ll_setsockopt_str() to set option with 
 // a non-integer value, if needed.
+// at the moment the only case for a non-integer value is setting 
+// send/receive timeouts (SO_RCVTIMEO and SO_SNDTIMEO)
+
+static int ll_setsocktimeout(lua_State *L) {
+	// lua api: setsocktimeout(fd, ms)
+	// set the socket send and receive timeout (given in milisecs)
+	// (0 means no timeout)
+	int fd = luaL_checkinteger(L, 1);
+	int ms = luaL_checkinteger(L, 2);
+	struct timeval tv;
+	tv.tv_sec = ms / 1000;
+	tv.tv_usec = (ms % 1000) * 1000;	
+	int r;
+	r = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+	if (r == -1) return nil_errno(L);
+	r = setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+	return int_or_errno(L, r);
+}
+
+
 
 static int ll_bind(lua_State *L) {
 	// lua api: bind(fd, addr)

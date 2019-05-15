@@ -48,6 +48,7 @@ void main() {
 	//~ dispsize(__time_t)
 	dispsize(time_t)
 	dispsize(struct timespec)
+	dispsize(struct timeval)
 	dispsize(struct stat)
 	dispintx(S_IFMT)  // mask for file type in mode
 	dispintx(S_IFSOCK)
