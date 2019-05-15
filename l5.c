@@ -830,6 +830,7 @@ static const struct luaL_Reg l5lib[] = {
 	//
 	{"socket", ll_socket},
 	{"setsockopt", ll_setsockopt},
+	{"setsocktimeout", ll_setsocktimeout},
 	{"bind", ll_bind},
 	{"listen", ll_listen},
 	{"accept", ll_accept},

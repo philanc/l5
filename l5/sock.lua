@@ -186,6 +186,12 @@ function sock.newsso(fd)
 	local sso = {}
 	if fd then sso.fd = fd end
 	--
+	function sso.timeout(sso, ms)
+		local r, eno = l5.setsocktimeout(sso.fd, ms)
+		if not r then return nil, errm(eno, "accept") end
+		return sso
+	end
+	--
 	function sso.bind(sso, addr, port)
 		sso.fd, em = sock.sbind(addr, port)
 		if not sso.fd then return nil, em end
@@ -281,7 +287,7 @@ function sock.newsso(fd)
 		local blen = 16384
 		local i, slen = 1, #str
 		local n, eno
-		while true do
+		while i < slen do
 			if i + blen - 1 >= slen then 
 				blen = slen - i + 1 
 			end

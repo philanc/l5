@@ -169,6 +169,7 @@ function test_5()  -- test sso objects
 	-- setup server
 	local ss = sock.newsso()
 	print('bind', ss:bind(soname, port))
+	print('timeout', ss:timeout(10000))
 	pid = l5.fork()
 	if pid == 0 then
 		-- child / client here
@@ -178,6 +179,7 @@ function test_5()  -- test sso objects
 		print('child connect', chs:connect(soname, port))
 		chs:write(line .. msg)
 		chs:close()
+		print("child exiting")
 		os.exit(0)
 	else
 		-- parent / server here
@@ -205,9 +207,9 @@ end
 
 ------------------------------------------------------------------------
 
-test_1()
+--~ test_1()
 --~ test_1a()
-test_2()
+--~ test_2()
 --~ test_2a()
 --~ test_3()
 --~ test_3a()
