@@ -105,7 +105,6 @@ function sock.sbind(addr, port, backlog)
 	if not r then return nil, errm(eno, "setsockopt") end
 	r, eno = l5.bind(fd, sockaddr)
 	if not r then return nil, errm(eno, "bind") end
-	local backlog = 32
 	r, eno = l5.listen(fd, backlog)
 	if not r then return nil, errm(eno, "listen") end
 	return fd
@@ -278,7 +277,19 @@ function sock.newsso(fd)
 	end
 	--
 	function sso.write(sso, str)
-		return l5.write(sso.fd, str)
+		-- attempt to write blen bytes at a time
+		local blen = 16384
+		local i, slen = 1, #str
+		local n, eno
+		while true do
+			if i + blen - 1 >= slen then 
+				blen = slen - i + 1 
+			end
+			n, eno = l5.write(sso.fd, str, i, blen)
+			if not n then return errm(eno, "write") end
+			i = i + n
+		end
+		return slen
 	end
 	--
 	function sso.close(sso) return l5.close(sso.fd) end
