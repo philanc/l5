@@ -76,7 +76,8 @@ accept(fd) => clientfd
 connect(fd, addr)
 recvfrom(fd, flags) => str, sockaddr
 recv(fd, flags) => str
-sendto(fb, str, flags, sockaddr) => n
+sendto(fb, str, flags, sockaddr [, idx, count]) => n
+send(fb, str, flags [, idx, count]) => n
 
 getsockname(fd) => sockaddr
 getpeername(fd) => sockaddr
