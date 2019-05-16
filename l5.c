@@ -669,26 +669,48 @@ static int ll_recv(lua_State *L) {
 }
 
 static int ll_sendto(lua_State *L) {
-	// lua api: sendto(fd, str, flags [, sockaddr])
-	// attempt to send string str at address sockaddr
+	// lua api: sendto(fd, str, flags, sockaddr [, idx, count])
+	// attempt to send count bytes in string str starting at index idx, 
+	// to address sockaddr.
+	// idx nd count are optional. they default to 1 and the number
+	// of remaining bytes in string.
 	// flags is an OR of all the MSG_* flags defined in sys/socket.h
-	// if sockaddr is not provided, assume the socket is connected; 
-	// then send() is used instead of sendto().
 	// return number of bytes actually sent, or nil, errno
-	int64_t len, count, salen;
+	int64_t len, idx, count, salen;
 	int n;
 	struct sockaddr *sa;
 	int fd = luaL_checkinteger(L, 1);
 	const char *str = luaL_checklstring(L, 2, &len);	
 	int flags = luaL_checkinteger(L, 3);
-	if (lua_isnoneornil(L, 4)) {
-		n = send(fd, str, len, flags);
-	} else {
-		sa = (struct sockaddr *)luaL_checklstring(L, 4, &salen);
-		n = sendto(fd, str, len, flags, sa, salen);
-	}
-	return int_or_errno(L, n);
+	sa = (struct sockaddr *)luaL_checklstring(L, 4, &salen);
+	idx = luaL_optinteger(L, 5, 1);
+	count = len + idx - 1;
+	count = luaL_optinteger(L, 6, count);
+	if ((idx < 1) || (idx + count - 1 > len)) LERR("out of range");
+	return int_or_errno(L, sendto(fd, str, len, flags, sa, salen));
 }
+
+static int ll_send(lua_State *L) {
+	// lua api: sendto(fd, str, flags [, idx, count])
+	// attempt to send count bytes in string str starting at index idx, 
+	// (assume the socket is connected. equivalent to write(), 
+	// but with flags)
+	// idx nd count are optional. they default to 1 and the number
+	// of remaining bytes in string.
+	// flags is an OR of all the MSG_* flags defined in sys/socket.h
+	// return number of bytes actually sent, or nil, errno
+	int64_t len, idx, count;
+	int n;
+	int fd = luaL_checkinteger(L, 1);
+	const char *str = luaL_checklstring(L, 2, &len);	
+	int flags = luaL_checkinteger(L, 3);
+	idx = luaL_optinteger(L, 4, 1);
+	count = len + idx - 1;
+	count = luaL_optinteger(L, 5, count);
+	if ((idx < 1) || (idx + count - 1 > len)) LERR("out of range");
+	return int_or_errno(L, send(fd, str, len, flags));
+}
+
 
 
 static int ll_getsockname(lua_State *L) {
@@ -838,6 +860,7 @@ static const struct luaL_Reg l5lib[] = {
 	{"recvfrom", ll_recvfrom},
 	{"recv", ll_recv},
 	{"sendto", ll_sendto},
+	{"send", ll_send},
 	{"getsockname", ll_getsockname},
 	{"getpeername", ll_getpeername},
 	{"getaddrinfo", ll_getaddrinfo},

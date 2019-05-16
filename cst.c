@@ -25,6 +25,7 @@
 
 #define dispint(x)	printf(#x " = %d\n", x);
 #define dispintx(x)	printf(#x " = 0x%08x\n", x);
+#define displongx(x)	printf(#x " = 0x%016lx\n", x);
 #define dispsize(x)	printf("sizeof " #x " = %d\n", sizeof(x));
 
 void main() {
@@ -153,6 +154,17 @@ void main() {
 	dispintx(SO_KEEPALIVE)
 	dispintx(MSG_DONTWAIT)
 	//~ dispintx()
+	
+	struct pollfd pfd;
+	pfd.fd=6; pfd.events=2; pfd.revents=3; 
+	dispsize(pfd.fd)
+	dispsize(pfd.events)
+	dispsize(pfd.revents)
+	long pfdl = * ((long *) &pfd);
+	displongx(pfdl)
+	
+	
+	
 	
 	printf("---\n");
 }
