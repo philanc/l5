@@ -200,6 +200,52 @@ function test_5()  -- test sso objects
 end
 
 
+------------------------------------------------------------------------
+-- test poll
+
+function test_6()
+	print("wait 2 secs")
+	print(l5.poll({}, 2000))
+	print("test_6 ok.")
+end
+
+local POLLIN = 1
+local POLLOUT = 4
+local POLLERR = 8
+local POLLHUP = 0x10
+local POLLNVAL = 0x20
+
+local function pfd(fd, events) 
+	return (fd << 32) | (events << 16)
+end
+
+local function pfdrev(pfd)
+	local fd, rev = pfd >> 32, pfd & 0xffff
+	return fd, rev
+end
+
+function test_7()
+	print("press return")
+	pl = { pfd(0, POLLIN),  }
+	pf("before: 0x%016x", pl[1])
+	print("poll:", l5.poll(pl, 10000))
+	pf("after:  0x%016x", pl[1])
+	print("test_7 ok.")
+end
+
+
+function test_7a()
+	print("press return")
+	pl = { pfd(0, POLLIN), pfd(1, POLLOUT), }
+--~ 	pl = { pfd(0, POLLIN), pfd(1, POLLOUT), pfd(3, POLLOUT) }
+	pf("before: 0x%016x", pl[1])
+	-- return immediately since stdout is available
+	print("poll:", l5.poll(pl, 10000))
+	pf("after:  0x%016x  0x%016x  ", pl[1], pl[2])
+--~ 	pf("after:  0x%016x  0x%016x  0x%016x  ", pl[1], pl[2], pl[3])
+	print("test_7a ok.")
+end
+
 
 
 
@@ -214,7 +260,9 @@ end
 --~ test_3()
 --~ test_3a()
 test_5()
-
+--~ test_6()
+test_7()
+test_7a()
 
 
 ------------------------------------------------------------------------

@@ -521,18 +521,44 @@ static int ll_ioctl_int(lua_State *L) {
 }
 
 static int ll_poll(lua_State *L) {
-	// lua api: poll(pollsetmb, nfds, timeout) => n | nil, errno
-	// pollsetmb: an array of struct pollfd stored in a memory block (mb)
-	// ndfs: number of  pollfd in the pollset
+	// lua api: poll(pollfdlist, timeout) => n | nil, errno
+	// pollfdlist: a list of struct pollfd stored as lua integers
 	// timeout:  timeout in millisecs
+	//	timeout=0:  return immediately even if no fd ready
+	//	timeout=-1: infinite timeout
 	//
-	void *mb = (void *)lua_touserdata(L, 1);
-	int64_t size = lua_rawlen(L, 1);
-	int nfds = luaL_checkinteger(L, 2);
-	if (nfds * 8 <= size) LERR("out of range");
-	int timeout = luaL_optinteger(L, 3, DEFAULT_TIMEOUT); 
-	struct pollfd *pfd = (struct pollfd *)mb;
-	return int_or_errno(L, poll(pfd, nfds, timeout));
+	struct pollfd pfda[256];
+	
+	// ensure first arg is a table (LUA_TTABLE=5, see lua.h)
+	luaL_checktype(L, 1, LUA_TTABLE);
+	size_t plen = luaL_len(L, 1);
+	if (plen >= 256) LERR("out of range");	
+	int timeout = luaL_optinteger(L, 2, DEFAULT_TIMEOUT);
+	
+	// fill the pollfd array
+	uint64_t pfd;
+	int i, n;
+	for (i=0; i < plen; i++) {
+		lua_rawgeti(L, 1, i+1);
+		pfd = luaL_checkinteger(L, -1);
+		lua_pop(L, 1);
+		pfda[i].fd = pfd >> 32;
+		pfda[i].events = (pfd >> 16) & 0xffff;
+	}
+	n = poll(pfda, plen, timeout);
+	if (n == -1) return nil_errno(L);
+	if (n == 0) RET_INT(0);
+	// poll result not 0 => update the pollfdlist table
+	for (i=0; i < plen; i++) {
+		if (pfda[i].revents != 0) {
+			pfd = ((int64_t)pfda[i].fd << 32) 
+				| (pfda[i].events << 16) 
+				| (pfda[i].revents); 
+			lua_pushinteger(L, pfd);
+			lua_rawseti(L, 1, i+1);
+		}
+	}
+	RET_INT(n);	
 }
 
 static int ll_pollin(lua_State *L) {
@@ -541,7 +567,7 @@ static int ll_pollin(lua_State *L) {
 	// lua api: pollin(fd, timeout)
 	// fd: fd to monitor (input only)
 	// timeout:  timeout in millisecs
-	// return 1 | 0 on timeout | nil, errno on error
+	// return 1 if fd is ready | 0 on timeout | nil, errno on error
 	int fd = luaL_checkinteger(L, 1);
 	int timeout = luaL_optinteger(L, 2, DEFAULT_TIMEOUT); 
 	struct pollfd pfd;

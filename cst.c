@@ -157,11 +157,16 @@ void main() {
 	
 	struct pollfd pfd;
 	pfd.fd=6; pfd.events=2; pfd.revents=3; 
-	dispsize(pfd.fd)
-	dispsize(pfd.events)
-	dispsize(pfd.revents)
+	//~ dispsize(pfd.fd)
+	//~ dispsize(pfd.events)
+	//~ dispsize(pfd.revents)
 	long pfdl = * ((long *) &pfd);
 	displongx(pfdl)
+	dispintx(POLLIN)
+	dispintx(POLLOUT)
+	dispintx(POLLHUP)
+	dispintx(POLLERR)
+	dispintx(POLLNVAL)
 	
 	
 	

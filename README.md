@@ -65,7 +65,7 @@ umount(dest)
 ioctl(fd, cmd, arg_in, outlen) => out
 ioctl_int(fd, cmd, intarg)
 
-poll(pollset, nfds, timeout) => n
+poll(pollfdlist, timeout) => n
 pollin(fd, timeout) => n -- monitor only one input fd
 
 socket(domain, type, protocol) => fd
