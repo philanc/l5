@@ -523,6 +523,7 @@ static int ll_ioctl_int(lua_State *L) {
 static int ll_poll(lua_State *L) {
 	// lua api: poll(pollfdlist, timeout) => n | nil, errno
 	// pollfdlist: a list of struct pollfd stored as lua integers
+	//	(fd << 32 | events << 16 | revents)
 	// timeout:  timeout in millisecs
 	//	timeout=0:  return immediately even if no fd ready
 	//	timeout=-1: infinite timeout
