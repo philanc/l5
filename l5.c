@@ -29,6 +29,7 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 #include <signal.h>	// kill
 #include <sys/wait.h>	// waitpid 
 #include <sys/mount.h>	// mount umount
+#include <sys/mman.h>	// mmap and friends
 
 
 #include "lua.h"
@@ -79,9 +80,6 @@ static int int_or_errno(lua_State *L, int n) {
 
 // buffer size for recv, recvfrom, read
 #define BUFSIZE 4096
-
-// flag for recv1. indicate that the param sockaddr is not used
-#define IGNORE_SA 0x01000000
 
 // default timeout: 10 seconds  (poll, ...)
 #define DEFAULT_TIMEOUT 10000
@@ -358,6 +356,54 @@ static int ll_dup2(lua_State *L) {
 	else newfd = dup2(oldfd, newfd);
 	return int_or_errno(L, newfd);
 }
+
+//----------------------------------------------------------------------
+// mmap, munmap, msync, ftruncate
+
+static int ll_mmap(lua_State *L) {
+	// lua api: mmap(len, prot, flags [, fd, offset])
+	// offset defaults to 0
+	// fd defaults to -1. in that case, MAP_ANONYMOUS is ORed to flags
+	// return a mb object [or just a ptr as lightuserdata]
+	size_t len = luaL_checkinteger(L, 1);
+	int prot = luaL_checkinteger(L, 2);
+	int flags = luaL_checkinteger(L, 3);
+	int fd = luaL_optinteger(L, 4, -1);
+	off_t offset  = luaL_optinteger(L, 5, 0);
+	if (fd == -1) flags |= MAP_ANONYMOUS;
+	// ZZZZZZZZZZZZZ
+	
+}
+
+static int ll_munmap(lua_State *L) {
+	// lua api: munmap(addr, len)
+	// get addr ZZZZZZZZ
+	void * addr = NULL;
+	size_t len = luaL_checkinteger(L, 2);
+	return int_or_errno(L, munmap(addr, len));
+	
+}
+
+static int ll_msync(lua_State *L) {
+	// lua api: msync(addr, len, flags)
+	// flags default to MS_SYNC 
+	// (ie. msync waits for the flush to complete)
+	// get addr ZZZZZZZZ
+	void * addr = NULL;
+	size_t len = luaL_checkinteger(L, 2);
+	int flags = luaL_optinteger(L, 3, MS_SYNC);
+	return int_or_errno(L, munmap(addr, len));
+	
+}
+
+static int ll_ftruncate(lua_State *L) {
+	// lua api: ftruncate(fd, len)
+	int fd = luaL_checkinteger(L, 1);
+	off_t len  = luaL_checkinteger(L, 2);
+	return int_or_errno(L, ftruncate(fd, len));
+}
+
+
 
 //----------------------------------------------------------------------
 // directories, filesystem 
@@ -859,6 +905,11 @@ static const struct luaL_Reg l5lib[] = {
 	{"read", ll_read},
 	{"write", ll_write},
 	{"dup2", ll_dup2},
+	//
+	{"mmap", ll_mmap},
+	{"munmap", ll_munmap},
+	{"msync", ll_msync},
+	{"ftruncate", ll_ftruncate},
 	//
 	{"opendir", ll_opendir},
 	{"readdir", ll_readdir},
