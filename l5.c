@@ -357,6 +357,15 @@ static int ll_dup2(lua_State *L) {
 	return int_or_errno(L, newfd);
 }
 
+static int ll_fileno(lua_State *L) {
+	// lua api: fileno(file) => fd | nil, errno
+	struct luaL_Stream *ls = luaL_checkudata(L,1,LUA_FILEHANDLE);
+	int fd = fileno(ls->f);
+	return int_or_errno(L, fd);
+}
+
+
+
 //----------------------------------------------------------------------
 // mmap, munmap, msync, ftruncate
 
@@ -905,6 +914,7 @@ static const struct luaL_Reg l5lib[] = {
 	{"read", ll_read},
 	{"write", ll_write},
 	{"dup2", ll_dup2},
+	{"fileno", ll_fileno},
 	//
 	{"mmap", ll_mmap},
 	{"munmap", ll_munmap},
