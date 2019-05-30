@@ -506,6 +506,23 @@ static int ll_lstat(lua_State *L) {
 	return 1;
 }
 
+static int ll_chown(lua_State *L) {
+	// lua api:  chown(pathname, uid, gid) => true | nil, errno
+	//
+	const char *pname = luaL_checkstring(L, 1);
+	int uid = luaL_checkinteger(L, 2);
+	int gid = luaL_checkinteger(L, 3);
+	return int_or_errno(L, chown(pname, uid, gid));
+}
+
+static int ll_chmod(lua_State *L) {
+	// lua api:  chmod(pathname, mode) => true | nil, errno
+	//
+	const char *pname = luaL_checkstring(L, 1);
+	int mode = luaL_checkinteger(L, 2);
+	return int_or_errno(L, chmod(pname, mode));
+}
+
 static int ll_symlink(lua_State *L) {
 	// lua api:  symlink(target, linkpath) => true | nil, errno
 	//
@@ -927,6 +944,8 @@ static const struct luaL_Reg l5lib[] = {
 	{"readlink", ll_readlink},
 	{"lstat3", ll_lstat3},
 	{"lstat", ll_lstat},
+	{"chown", ll_chown},
+	{"chmod", ll_chmod},
 	{"symlink", ll_symlink},
 	{"mkdir", ll_mkdir},
 	{"rmdir", ll_rmdir},
