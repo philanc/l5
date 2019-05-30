@@ -48,6 +48,7 @@ read(fd) => str  --(read up to 4 kbytes)
 write(fd, str [, idx, count]) => n
 close(fd)
 dup2(oldfd [, newfd]) => newfd
+fileno(file) => fd
 
 opendir(pathname) => dfd
 readdir(dfd) => pathname, filetype
@@ -55,6 +56,8 @@ closedir(dfd)
 readlink(pathname) => target pathname
 lstat3(pathname) => mode, size, mtime
 lstat(pathname, tbl) => tbl  --a list of stat fields
+chown(pathname, uid, gid)
+chmod(pathname, mode)
 symlink(target, linkpath)
 mkdir(pathname)
 rmdir(pathname)
