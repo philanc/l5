@@ -49,6 +49,8 @@ write(fd, str [, idx, count]) => n
 close(fd)
 dup2(oldfd [, newfd]) => newfd
 fileno(file) => fd
+fdopen(fd) => file
+ftruncate(fd, size)
 
 opendir(pathname) => dfd
 readdir(dfd) => pathname, filetype

@@ -272,6 +272,7 @@ static int ll_fileno(lua_State *L) {
 
 static int closef(lua_State *L) {
 	// local helper function for fdopen below
+	// (see luaL_Stream in Lua manual)
 	luaL_Stream *ls = luaL_checkudata(L, 1, LUA_FILEHANDLE);
 	int n = fclose(ls->f);
 	if (n != 0) return nil_errno(L);
@@ -284,8 +285,8 @@ static int ll_fdopen(lua_State *L) {
 	int fd = luaL_checkinteger(L, 1);
 	const char *mode = luaL_checkstring(L, 2);
 	luaL_Stream *ls = lua_newuserdata(L,sizeof(luaL_Stream));
-	ls->f = fdopen(fd, mode);
-	ls->closef = closef;
+	ls->f = fdopen(fd, mode); 
+	ls->closef = closef; // local helper function. see above.
 	if (ls->f == NULL) return nil_errno(L);
 	return 1;
 }
