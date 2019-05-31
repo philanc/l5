@@ -84,100 +84,6 @@ static int int_or_errno(lua_State *L, int n) {
 // default timeout: 10 seconds  (poll, ...)
 #define DEFAULT_TIMEOUT 10000
 
-//----------------------------------------------------------------------
-// memory buffer object
-// userdata, allocated memory.  api: 
-// new(bytesize) => mb  --(bytesize must be multiple of 8)
-// get(mb, byteindex, len) => string
-// set(mb, byteindex, string)
-// geti(mb, byteindex) => integer -- index must be aligned
-// seti(mb, byteindex, integer)   -- index must be aligned
-//
-// Usage in C  - with a mb object on the stack at index idx:
-//	
-// 	char *mb = lua_touserdata(L, idx); // get a pointer to buffer
-//	size_t size = lua_rawlen(L, idx);  // get buffer size
-
-#define MBNAME "mb_memory_buffer"
-
-static int ll_mbnew(lua_State *L) {
-	// lua api: mbnew(size) => mb, ptr as integer
-	// return a memory buffer with the given size and a pointer 
-	// to the beginning of the block as a Lua integer
-	// the memory block is zeroed.
-	size_t size = luaL_checkinteger(L, 1);
-	if ((size % 8) != 0) LERR("mbnew: size must be multiple of 8");
-	char *mb = (char *) lua_newuserdata(L, size);
-	memset(mb, 0, size); 
-	luaL_getmetatable(L, MBNAME);
-	lua_setmetatable(L, -2);
-	lua_pushinteger(L, (int64_t)mb);
-	return 2;
-}
-
-static int ll_mbget(lua_State *L) {
-	// lua api:  mb:get(idx, len)
-	// return the len bytes at offset idx as a string
-	// byte offset start at 0
-	// if len is too large given mb size and idx, the function errors.
-	// if len is not provided it deafults to the mb size
-	// if idx is not provided, it defaults to 0
-	// so mg:get() returns all the content of the mb as a string
-	char *mb = lua_touserdata(L, 1);
-	int64_t size = lua_rawlen(L, 1);
-	int64_t idx = luaL_optinteger(L, 2, 0);
-	int64_t len = luaL_optinteger(L, 3, size);
-	if ((idx+len) > size) LERR("out of range");
-	RET_STRN(mb + idx, len);
-}
-
-static int ll_mbset(lua_State *L) {
-	// lua api:  mb:set(idx, str)
-	// copy string str in mb at byte offset idx (starting at 0) 
-	// if  string is too long to fit, the function errors.
-	char *mb = lua_touserdata(L, 1);
-	int64_t size = lua_rawlen(L, 1);
-	int64_t idx = luaL_checkinteger(L, 2);
-	int64_t len;
-	const char *str = luaL_checklstring(L, 3, &len);
-	if ((idx+len) > size) LERR("out of range");	
-	memcpy(mb + idx, str, len);
-	RET_TRUE;
-}
-
-static int ll_mbzero(lua_State *L) {
-	// lua api:  mb:zero()
-	// fill the memory block with zeros
-	char *mb = lua_touserdata(L, 1);
-	int64_t size = lua_rawlen(L, 1);
-	memset(mb, 0, size);
-	RET_TRUE;
-}
-	
-static int ll_mbseti(lua_State *L) {
-	// lua api: mb:seti(idx, i)
-	// writes integer i at byte offset idx (starting at 0)
-	char *mb = lua_touserdata(L, 1);
-	int64_t size = lua_rawlen(L, 1);
-	int64_t idx = luaL_checkinteger(L, 2);
-	int64_t i = luaL_checkinteger(L, 3);
-	if ((idx < 0) || (idx >= size)) LERR("out of range");
-	if ((idx & 7) != 0) LERR("unaligned access");
-	*((int64_t *)(mb + idx)) = i;
-	RET_TRUE;
-}
-
-static int ll_mbgeti(lua_State *L) {
-	// lua api: mb:geti(idx)
-	// mb is seen as an array of int64, starting at offset 0
-	// mb:geti(idx) returns the element at offset idx
-	char *mb = lua_touserdata(L, 1);
-	int64_t size = lua_rawlen(L, 1);
-	int64_t idx = luaL_checkinteger(L, 2);
-	if ((idx < 0) || (idx >= size)) LERR("out of range");
-	if ((idx & 7) != 0) LERR("unaligned access");
-	RET_INT(*((int64_t *)(mb + idx)));
-}
 
 //------------------------------------------------------------
 // l5 functions
@@ -866,7 +772,6 @@ int ll_getnameinfo(lua_State *L) {
 // l5 function table
 static const struct luaL_Reg l5lib[] = {
 	//
-	{"mbnew", ll_mbnew},
 	//
 	{"getpid", ll_getpid},
 	{"getppid", ll_getppid},
@@ -931,26 +836,8 @@ static const struct luaL_Reg l5lib[] = {
 	{NULL, NULL},
 };
 
-// l5 memory block (mb) methods
-static const struct luaL_Reg l5mbfuncs[] = {
-	{"get", ll_mbget},
-	{"set", ll_mbset},
-	{"geti", ll_mbgeti},
-	{"seti", ll_mbseti},
-	{"zero", ll_mbzero},
-	{NULL, NULL},
-};
-
 int luaopen_l5 (lua_State *L) {
 	
-	// register MB metatable
-	luaL_newmetatable(L, MBNAME);
-	luaL_setfuncs(L, l5mbfuncs, 0);
-	lua_pushliteral(L, "__index");
-	lua_pushvalue(L, -2);
-	lua_settable(L, -3);	
-	lua_pop(L, 1);  // pop the metatable left on the stack
-
 	// register main library functions
 	//~ luaL_register (L, "l5", l5lib);
 	luaL_newlib (L, l5lib);

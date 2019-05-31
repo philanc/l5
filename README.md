@@ -89,14 +89,6 @@ getnameinfo(sockaddr) => host, port
 
 -- In case of error, most functions return nil, errno.
 
--- memory buffer interface: read/write a string or an integer
-mbnew(size) => mb
-mb:get(offset, len) => str
-mb:set(offset, str)
-mb:geti(offset) => int
-mb:seti(offset, int)
-
-
 ```
 
 
