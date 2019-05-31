@@ -270,6 +270,26 @@ static int ll_fileno(lua_State *L) {
 	return int_or_errno(L, fd);
 }
 
+static int closef(lua_State *L) {
+	// local helper function for fdopen below
+	luaL_Stream *ls = luaL_checkudata(L, 1, LUA_FILEHANDLE);
+	int n = fclose(ls->f);
+	if (n != 0) return nil_errno(L);
+	ls->closef = NULL;
+	RET_TRUE;
+}
+
+static int ll_fdopen(lua_State *L) {
+	// lua api: fdopen(fd) => filehandle | nil, errno
+	int fd = luaL_checkinteger(L, 1);
+	const char *mode = luaL_checkstring(L, 2);
+	luaL_Stream *ls = lua_newuserdata(L,sizeof(luaL_Stream));
+	ls->f = fdopen(fd, mode);
+	ls->closef = closef;
+	if (ls->f == NULL) return nil_errno(L);
+	return 1;
+}
+
 static int ll_ftruncate(lua_State *L) {
 	// lua api: ftruncate(fd, len)
 	int fd = luaL_checkinteger(L, 1);
@@ -659,7 +679,7 @@ static int ll_send(lua_State *L) {
 	// attempt to send count bytes in string str starting at index idx, 
 	// (assume the socket is connected. equivalent to write(), 
 	// but with flags)
-	// idx nd count are optional. they default to 1 and the number
+	// idx and count are optional. they default to 1 and the number
 	// of remaining bytes in string.
 	// flags is an OR of all the MSG_* flags defined in sys/socket.h
 	// return number of bytes actually sent, or nil, errno
@@ -674,8 +694,6 @@ static int ll_send(lua_State *L) {
 	if ((idx < 1) || (idx + count - 1 > len)) LERR("out of range");
 	return int_or_errno(L, send(fd, str, len, flags));
 }
-
-
 
 static int ll_getsockname(lua_State *L) {
 	// get the address a socket is bound to
@@ -700,7 +718,6 @@ static int ll_getpeername(lua_State *L) {
 	if (n == -1) return nil_errno(L);
 	RET_STRN((char *)&addr, len);
 }
-
 
 static int ll_getaddrinfo(lua_State *L) {
 	// interface to DNS:
@@ -796,6 +813,7 @@ static const struct luaL_Reg l5lib[] = {
 	{"write", ll_write},
 	{"dup2", ll_dup2},
 	{"fileno", ll_fileno},
+	{"fdopen", ll_fdopen},
 	{"ftruncate", ll_ftruncate},
 	//
 	{"opendir", ll_opendir},
