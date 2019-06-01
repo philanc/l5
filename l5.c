@@ -1,4 +1,4 @@
-// Copyright (c) 2019  Phil Leblanc  -- see LICENSE file
+	// Copyright (c) 2019  Phil Leblanc  -- see LICENSE file
 // ---------------------------------------------------------------------
 /*   
 
@@ -285,6 +285,8 @@ static int ll_fdopen(lua_State *L) {
 	int fd = luaL_checkinteger(L, 1);
 	const char *mode = luaL_checkstring(L, 2);
 	luaL_Stream *ls = lua_newuserdata(L,sizeof(luaL_Stream));
+	luaL_getmetatable(L, LUA_FILEHANDLE);
+	lua_setmetatable(L, -2);
 	ls->f = fdopen(fd, mode); 
 	ls->closef = closef; // local helper function. see above.
 	if (ls->f == NULL) return nil_errno(L);

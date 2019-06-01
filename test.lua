@@ -16,21 +16,6 @@ local insert, concat = table.insert, table.concat
 local errm, rpad, repr = util.errm, util.rpad, util.repr
 local pf, px = util.pf, util.px
 
-------------------------------------------------------------------------
-
-function test_mb()
-	-- test memory block (mb) methods
-	mb = l5.mbnew(1024)
-	assert(mb:seti(48, 123))
-	assert(mb:geti(48) == 123)
-	assert(mb:zero())
-	assert(mb:geti(48) == 0)
-	mb:zero()
-	assert(mb:set(16, "abc"))
-	assert(mb:get(16, 5) == "abc\0\0")
-	assert(mb:geti(16) & 0xff == 97) -- !! little endian only :-)
-	print("test_mb: ok.")
-end
 
 ------------------------------------------------------------------------
 -- test process info
@@ -236,9 +221,10 @@ function test_fs()
 end
 
 
+
+
 ------------------------------------------------------------------------
 
-test_mb()
 test_procinfo()
 test_stat()
 --~ test_tty_mode()
