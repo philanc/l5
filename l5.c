@@ -628,9 +628,6 @@ static int ll_recvfrom(lua_State *L) {
 	socklen_t addrbuflen = 136;
 	int n = recvfrom(fd, buf, BUFSIZE, flags, 
 		(struct sockaddr *) addrbuf, &addrbuflen);
-	// when DONTWAIT is used and there is nothing to read, return 0
-	if ((n == -1) && (errno == EAGAIN) && 
-		(flags & MSG_DONTWAIT) != 0) n = 0;
 	if (n == -1) return nil_errno(L);
 	lua_pushlstring(L, buf, n);
 	lua_pushlstring(L, addrbuf, addrbuflen);
@@ -647,9 +644,6 @@ static int ll_recv(lua_State *L) {
 	char buf[BUFSIZE];
 	int flags = luaL_optinteger(L, 2, 0);
 	int n = recv(fd, buf, BUFSIZE, flags);
-	// when DONTWAIT is used and there is nothing to read, return 0
-	if ((n == -1) && (errno == EAGAIN) && 
-		(flags & MSG_DONTWAIT) != 0) n = 0;
 	if (n == -1) return nil_errno(L);
 	lua_pushlstring(L, buf, n);
 	return 1; 

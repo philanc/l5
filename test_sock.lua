@@ -18,6 +18,7 @@ local pf, px = util.pf, util.px
 ------------------------------------------------------------------------
 
 function test_1()
+	-- send to a unix datagram socket
 	local a, ab, fd, eno, em, em2, r, n, mb, msg, msg2
 	soname = "./aaa"
 	os.remove(soname)
@@ -48,13 +49,13 @@ function test_1a() -- same as test_1() with dso object
 	a = d.sa
 	assert(d:send(msg, a))
 	r, ab = d:recv()
---~ 	print(r, repr(ab))
 	assert(a == ab)
 	assert(msg == r)
 	r, ab = d:recv(0x40) -- MSG_DONTWAIT = 0x00000040
-	print(r, repr(ab))  --> nil, 11 EAGAIN
+	assert(r==nil and ab==11) -- EAGAIN=11
 	d:close()
-	print(d:send(msg, a))  --> nil, 9 EBADF 
+	r, eno = d:send(msg, a)  --> nil, 9 EBADF 
+	assert(r == nil and eno == 9)
 	os.remove(soname)
 	print("test_1a ok.")
 end
@@ -63,7 +64,6 @@ function test_2()
 	local a, ab, fd, eno, em, em2, r, n, mb, msg, msg2
 	soname = "./aaa"
 	os.remove(soname)
---~ 	mb = l5.mbnew(1400)
 	fd = assert(sock.dsocket(1))
 	a = sock.make_unix_sockaddr(soname)
 --~ 	print("sockaddr:", repr(a), #a)
@@ -75,7 +75,7 @@ function test_2()
 	assert(r, errm(eno, "write"))
 	r, eno = l5.read(fd)
 	assert(r, errm(eno, "read"))
-	print("read:", r)
+	assert(r == msg)
 --~ 	msg2 = mb:get(0, r)
 --~ 	assert(msg2 == msg)
 --~ 	print("recvfrom", repr(ab), #ab, r, repr(msg2))
@@ -87,7 +87,7 @@ end
 local IGNORE_SA = 0x01000000
 local DONTWAIT = 0x40
 
-function test_2a()  -- as test_2, with send1/recv1
+function test_2a()  -- as test_2, with send/recv
 	local a, ab, fd, eno, em, em2, r, n, mb, msg, msg2
 	soname = "./aaa"
 	os.remove(soname)
@@ -96,9 +96,9 @@ function test_2a()  -- as test_2, with send1/recv1
 	assert(l5.bind(fd, a))
 	msg = "hello-1"
 	assert(l5.connect(fd, a))
-	r, eno = l5.send1(fd, msg, IGNORE_SA)
+	r, eno = l5.send(fd, msg, 0)
 	assert(r, errm(eno, "send1"))
-	r, eno = l5.recv1(fd, IGNORE_SA)
+	r, eno = l5.recv(fd)
 	assert(r, errm(eno, "recv1"))
 --~ 	print("read:", r)
 	assert(r == msg)
@@ -119,7 +119,7 @@ function test_3()
 	for i = 1, 1000 do
 		r, eno = d:send(msg, a, DONTWAIT)
 		if not r then 
-			pf("#msg: %d  iter: %d  tot: %d  eno: %d", 
+			pf("test_3 #msg: %d  iter: %d  tot: %d  errno: %d", 
 				#msg, i, tot, eno)
 			break
 		end
@@ -147,7 +147,7 @@ function test_3a()  -- same as test_3() with a (local) af_inet socket
 	for i = 1, 10000 do
 		r, eno = d:send(msg, a, DONTWAIT)
 		if (not r) or (r < #msg) then 
-			pf("#msg: %d  iter: %d  tot: %d  eno: %d", 
+			pf("test_3a #msg: %d  iter: %d  tot: %d  errno: %d", 
 				#msg, i, tot, eno)
 			break
 		end
@@ -168,28 +168,28 @@ function test_5()  -- test sso objects
 	
 	-- setup server
 	local ss = sock.newsso()
-	print('bind', ss:bind(soname, port))
-	print('timeout', ss:timeout(10000))
+	assert(ss:bind(soname, port) == ss)
+	assert(ss:timeout(10000) == ss)
 	pid = l5.fork()
 	if pid == 0 then
 		-- child / client here
 		chs = sock.newsso()
-		print('child chs', chs)
+--~ 		print('child chs', chs)
 		l5.msleep(100) -- give time to the server to accept
-		print('child connect', chs:connect(soname, port))
+		assert(chs:connect(soname, port) == chs)
 		chs:write(line .. msg)
 		chs:close()
-		print("child exiting")
+--~ 		print("child exiting")
 		os.exit(0)
 	else
 		-- parent / server here
 		cs, em = ss:accept()
-		print('parent accept cs', cs, em)
+--~ 		print('parent accept cs', cs, em)
 		l2, em = cs:read()
 		assert(l2, em)
 		m2, em = cs:read(mlen)
 		assert(m2, em)
-		print(l2, #m2)
+--~ 		print(l2, #m2)
 		assert(l2 == he.strip(line))
 		assert(m2 == msg)
 		cs:close()
@@ -204,9 +204,10 @@ end
 -- test poll
 
 function test_6()
-	print("wait 2 secs")
-	print(l5.poll({}, 2000))
-	print("test_6 ok.")
+	print("test_6 waiting 1 sec")
+	r = l5.poll({}, 1000)
+	assert(r == 0)
+	print("test_6 ok. (waited 1 sec)")
 end
 
 local POLLIN = 1
@@ -225,24 +226,32 @@ local function pfdrev(pfd)
 end
 
 function test_7()
-	print("press return")
+	print("test_7 press return within 3 sec.")
 	pl = { pfd(0, POLLIN),  }
-	pf("before: 0x%016x", pl[1])
-	print("poll:", l5.poll(pl, 10000))
-	pf("after:  0x%016x", pl[1])
-	print("test_7 ok.")
+--~ 	pf("before: 0x%016x", pl[1])
+	r = l5.poll(pl, 3000) -- wait 3 sec max
+	assert(r == 0 or r == 1) 
+--~ 	pf("after:  0x%016x", pl[1])
+	assert(pl[1]==0x10000 or pl[1]==0x10001)
+	if pl[1]==0x10001 then io.read() end -- read the newline
+	desc = pl[1]==0x10001 
+		and "(return pressed)" 
+		or "(return not pressed. waited 3 sec.)"
+	print("test_7 ok. " .. desc)
 end
 
 
 function test_7a()
-	print("press return")
+--~ 	print("press return")
 	pl = { pfd(0, POLLIN), pfd(1, POLLOUT), }
 --~ 	pl = { pfd(0, POLLIN), pfd(1, POLLOUT), pfd(3, POLLOUT) }
-	pf("before: 0x%016x", pl[1])
+--~ 	pf("before: 0x%016x", pl[1])
 	-- return immediately since stdout is available
-	print("poll:", l5.poll(pl, 10000))
-	pf("after:  0x%016x  0x%016x  ", pl[1], pl[2])
+	r = l5.poll(pl, 5000)
+	assert(r==1 or r==2)  -- maybe more than one return pressed before
+--~ 	pf("after:  0x%016x  0x%016x  ", pl[1], pl[2])
 --~ 	pf("after:  0x%016x  0x%016x  0x%016x  ", pl[1], pl[2], pl[3])
+	assert(pl[2] == 0x100040004) -- stdout is available for output
 	print("test_7a ok.")
 end
 
@@ -253,14 +262,14 @@ end
 
 ------------------------------------------------------------------------
 
---~ test_1()
---~ test_1a()
---~ test_2()
---~ test_2a()
---~ test_3()
---~ test_3a()
+test_1()
+test_1a()
+test_2()
+test_2a()
+test_3()
+test_3a()
 test_5()
---~ test_6()
+test_6()
 test_7()
 test_7a()
 

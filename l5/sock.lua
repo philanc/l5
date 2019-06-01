@@ -161,13 +161,13 @@ function sock.newdso(family)
 	--
 	function dso.recv(dso, flags)
 		flags = flags or 0
-		return l5.recv(dso.fd, flags)
+		return l5.recvfrom(dso.fd, flags)
 	end
 	--
 	function dso.send(dso, str, dest, flags)
 		-- #str must be < sock.BUFSIZE1
 		flags = flags or 0
-		return l5.send(dso.fd, str, flags, dest)
+		return l5.sendto(dso.fd, str, flags, dest)
 	end
 	--
 	function dso.close(dso) return l5.close(dso.fd) end
