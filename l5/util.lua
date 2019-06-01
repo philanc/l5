@@ -46,6 +46,19 @@ function util.fget(fname)
 	return s
 end
 
+function util.fput(fname, content)
+	-- write 'content' to file 'fname'
+	-- return true in case of success, or nil, msg in case of error
+	local f, msg, r
+	f, msg = io.open(fname, 'wb')
+	if not f then return nil, msg end
+	r, msg = f:write(content)
+	f:flush(); f:close()
+	if not r then return nil, msg else return true end
+end
+
+
+
 
 
 ------------------------------------------------------------------------

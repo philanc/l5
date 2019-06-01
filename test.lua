@@ -207,17 +207,34 @@ function test_fs()
 	pn = "l5.c"; fa = fs.stat(pn)
 --~ 	print(pn, fs.ftype(fa), fs.fperms(fa), fs.fsize(fa), 
 --~ 		"is executable: ", fs.fexec(fa))
-	assert(fs.ftype(fa)=="r" and not fs.fexec(fa))
+	assert(fs.ftype(fa[3])=="r" and not fs.fexec(fa[3]))
 	pn = "/bin/bash"; fa = fs.stat(pn)
 --~ 	print(pn, fs.ftype(fa), fs.fperms(fa), fs.fsize(fa),
 --~ 		"is executable: ", fs.fexec(fa))
-	assert(fs.ftype(fa)=="r" and fs.fexec(fa))
+	assert(fs.ftype(fa[3])=="r" and fs.fexec(fa[3]))
 	pn = "l5/"; fa = fs.stat(pn)
 --~ 	print(pn, fs.ftype(fa), fs.fperms(fa), fs.fsize(fa),
 --~ 		"is executable: ", fs.fexec(fa))
-	assert(fs.ftype(fa)=="d" and not fs.fexec(fa))
+	assert(fs.ftype(fa[3])=="d" and not fs.fexec(fa[3]))
 	
 	print("test_fs: ok.")
+end
+
+function test_file()
+	-- 
+	-- create a tmp file with content "hello"
+	fname = "/tmp/l5zz"
+	util.fput(fname, "hello")
+	local fd, eno, r, s, f
+	local O_RDWR = 0x00000002
+	fd = assert(l5.open(fname, O_RDWR, 0))
+	assert(l5.ftruncate(fd, 20))
+	assert(fs.fsize(fname) == 20)
+	f= assert(l5.fdopen(fd, 'a')) -- f is a lua file object
+	f:write("world!"); f:flush(); f:close()
+	assert(util.fget(fname) == rpad("hello", 20, '\0') .. "world!")
+	os.execute("rm " .. fname)
+	print("test_file: ok.")
 end
 
 
@@ -230,6 +247,7 @@ test_stat()
 --~ test_tty_mode()
 test_fork()
 test_fs()
+test_file()
 
 
 -- test execve

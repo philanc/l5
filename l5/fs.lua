@@ -155,30 +155,29 @@ function fs.stat(fpath, tbl)
 	return fa
 end
 
--- access commonly used fields of an attributes table
+-- commonly used field indexes in an attributes table
+fs.st_mode = 3
+fs.st_size = 8
+fs.st_mtim = 12
+fs.st_uid = 5
+fs.st_gid = 6
 
-function fs.mode(fa) return fa[3] end
-function fs.fsize(fa) return fa[8] end
-function fs.fmod(fa) return fa[12] end
-function fs.uid(fa) return fa[5] end
-function fs.gid(fa) return fa[6] end
-
-function fs.ftype(fa) 
+function fs.ftype(mode) 
 	-- return file type as a one char string (f=fifo, c=chardev,
 	-- d=directory, b=blockdev, r=regular, l=link, s=socket)
-	return typestr((fa[3] >> 12) & 0x1f) 
+	return typestr((mode >> 12) & 0x1f) 
 end
 
-function fs.fperms(fa) 
+function fs.fperms(mode) 
 	-- return the octal representation of permissions as a string
 	-- eg. "0755", "4755", "0600", etc.
-	return strf("%04o", fa[3] & 0x0fff) 
+	return strf("%04o", mode & 0x0fff) 
 end
 
-function fs.fexec(fa) 
+function fs.fexec(mode) 
 	-- retrun true if file is a regular file and executable
 	-- (0x49 == 0o0111)
-	return ((fa[3] & 0x49) ~= 0) and ((fa[3] >> 12) == 8) 
+	return ((mode & 0x49) ~= 0) and ((mode >> 12) == 8) 
 end
 
 function fs.stat3(fpath)
@@ -189,7 +188,12 @@ function fs.stat3(fpath)
 	local ftype = typestr((mode >> 12) & 0x1f)
 	return ftype, size, mtime
 end
-	
+
+function fs.fsize(fpath)
+	local mode, size, mtime = l5.lstat3(fpath)
+	if not mode then return nil, errm(size, "stat3") end
+	return size
+end
 
 -- some useful mount options
 
