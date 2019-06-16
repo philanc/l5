@@ -227,12 +227,16 @@ static int ll_close(lua_State *L) {
 }
 
 static int ll_read(lua_State *L) { 
-	// lua api:  read(fd) => str
-	// attempt to read BUFSIZE (4,096) bytes (ie. 4kb)
+	// lua api:  read(fd [, n]) => str
+	// attempt to read cnt bytes 
+	// cnt must be less or equal to BUFSIZE (4,096) bytes (ie. 4kb)
+	// cnt defaults to BUFSIZE
 	// return read bytes as a string or nil, errno
 	char buf[BUFSIZE];
 	int fd = luaL_checkinteger(L, 1);
-	int n = read(fd, buf, BUFSIZE);
+	int cnt = luaL_optinteger(L, 2, BUFSIZE);
+	if (cnt > BUFSIZE) LERR("cnt too large");
+	int n = read(fd, buf, cnt);
 	if (n == -1) return nil_errno(L);
 	RET_STRN(buf, n);
 }
