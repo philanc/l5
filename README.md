@@ -44,7 +44,7 @@ kill(pid, sig)
 execve(pname, argv, envp)
 
 open() => fd
-read(fd) => str  --(read up to 4 kbytes)
+read(fd, cnt) => str  --(read up to 4 kbytes)
 write(fd, str [, idx, count]) => n
 close(fd)
 dup2(oldfd [, newfd]) => newfd

@@ -227,7 +227,7 @@ static int ll_close(lua_State *L) {
 }
 
 static int ll_read(lua_State *L) { 
-	// lua api:  read(fd [, n]) => str
+	// lua api:  read(fd [, cnt]) => str
 	// attempt to read cnt bytes 
 	// cnt must be less or equal to BUFSIZE (4,096) bytes (ie. 4kb)
 	// cnt defaults to BUFSIZE
