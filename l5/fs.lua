@@ -147,36 +147,51 @@ function fs.findall(dirpath)
 	return fl
 end
 
-function fs.stat(fpath, tbl)
-	-- return an "attributes" or "lstat" table for a file
-	tbl = tbl or {}
-	local fa, eno = l5.lstat(fpath, tbl)
-	if not fa then return nil, errm(eno, "lstat") end
-	return fa
+fs.attribute_ids = {
+	dev = 1,
+	ino = 2,
+	mode = 3,
+	nlink = 4,
+	uid = 5,
+	gid = 6,
+	rdev = 7,
+	size = 8,
+	blksize= 9,
+	blocks = 10,
+	atime = 11,
+	mtime = 12,
+	ctime = 13,
+}
+
+function fs.attributes(fpath, what, statflag)
+	-- this is inspired by lfs attributes()
+	-- it combines lfs.attributes and lfs.symlinkattributes 
+	statflag = statflag or 0
+	what = what or {}
+	if type(what) == "string" then 
+		what = fs.attribute_ids[what]
+		assert(what, "unknown lstat attribute")
+	end
+	return l5.lstat(fpath, what, statflag)
 end
+	
 
--- commonly used field indexes in an attributes table
-fs.st_mode = 3
-fs.st_size = 8
-fs.st_mtim = 12
-fs.st_uid = 5
-fs.st_gid = 6
-
-function fs.ftype(mode) 
+function fs.mtype(mode) 
 	-- return file type as a one char string (f=fifo, c=chardev,
 	-- d=directory, b=blockdev, r=regular, l=link, s=socket)
 	return typestr((mode >> 12) & 0x1f) 
 end
 
-function fs.fperms(mode) 
+function fs.mperms(mode) 
 	-- return the octal representation of permissions as a string
 	-- eg. "0755", "4755", "0600", etc.
 	return strf("%04o", mode & 0x0fff) 
 end
 
-function fs.fexec(mode) 
-	-- retrun true if file is a regular file and executable
+function fs.mexec(mode) 
+	-- return true if file is a regular file and executable
 	-- (0x49 == 0o0111)
+	-- note: true if executable "by someone" --maybe not by the caller!!
 	return ((mode & 0x49) ~= 0) and ((mode >> 12) == 8) 
 end
 
