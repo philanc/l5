@@ -28,14 +28,14 @@ function fs.makepath(dirname, name)
 end
 
 local typt = {
-	[1]="f",	--fifo
-	[2]="c",	--char device
-	[4]="d",	--directory
-	[6]="b",	--block device
-	[8]="r", 	--regular
-	[10]="l", 	--link
-	[12]="s",	--socket
-	--[14]="w",	--whiteout (bsd? and/or codafs? => ignore it)
+	[1] = "f",	--fifo
+	[2] = "c",	--char device
+	[4] = "d",	--directory
+	[6] = "b",	--block device
+	[8] = "r", 	--regular
+	[10]= "l", 	--link
+	[12]= "s",	--socket
+	--[14]= "w",	--whiteout (only bsd? and/or codafs? => ignore it)
 }
 
 local function typestr(ft)
@@ -163,26 +163,15 @@ fs.attribute_ids = {
 	ctime = 13,
 }
 
-function fs.attributes(fpath, what, statflag)
-	-- this is inspired by lfs attributes()
-	-- it combines lfs.attributes and lfs.symlinkattributes 
-	statflag = statflag or 0
-	what = what or {}
-	if type(what) == "string" then 
-		what = fs.attribute_ids[what]
-		assert(what, "unknown lstat attribute")
-	end
-	return l5.lstat(fpath, what, statflag)
-end
-	
-
 function fs.mtype(mode) 
+	-- extract the file type from the stat mode attribute
 	-- return file type as a one char string (f=fifo, c=chardev,
 	-- d=directory, b=blockdev, r=regular, l=link, s=socket)
 	return typestr((mode >> 12) & 0x1f) 
 end
 
 function fs.mperms(mode) 
+	-- extract the permissions from the stat mode attribute
 	-- return the octal representation of permissions as a string
 	-- eg. "0755", "4755", "0600", etc.
 	return strf("%04o", mode & 0x0fff) 
@@ -193,6 +182,31 @@ function fs.mexec(mode)
 	-- (0x49 == 0o0111)
 	-- note: true if executable "by someone" --maybe not by the caller!!
 	return ((mode & 0x49) ~= 0) and ((mode >> 12) == 8) 
+end
+
+function fs.attr(stat_tbl, attr_name)
+	-- stat_tbl is a table returned by stat()
+	-- attr_name is the name of an attribute
+	local attr_id = fs.attribute_ids[attr_name] 
+		or error("unknown attribute name")
+	return stat_tbl[attr_id]
+end
+
+function fs.lstat(fpath, what, statflag)
+	statflag = statflag and 1 or nil
+	what = what or {}
+	print('111', what)
+	if type(what) == "string" then
+		what = fs.attribute_ids[what]
+		assert(what, "unknown attribute name")
+	else
+		assert(type(what) == "table")
+	end
+	return l5.lstat(fpath, what, statflag)
+end
+
+function fs.stat(fpath, what)
+	return fs.lstat(fpath, what, 1)
 end
 
 function fs.stat3(fpath)
