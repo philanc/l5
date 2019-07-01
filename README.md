@@ -57,7 +57,8 @@ readdir(dfd) => pathname, filetype
 closedir(dfd)
 readlink(pathname) => target pathname
 lstat3(pathname) => mode, size, mtime
-lstat(pathname, tbl) => tbl  --a list of stat fields
+lstat(pathname, what) => a list of stat fields, or a single attribute
+utime(pathname [, time])
 chown(pathname, uid, gid)
 chmod(pathname, mode)
 symlink(target, linkpath)

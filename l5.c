@@ -24,6 +24,7 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 #include <sys/ioctl.h>	// ioctl
 #include <poll.h>	// poll
 #include <time.h>	// nanosleep
+#include <utime.h>	// utime
 #include <sys/socket.h>	// socket..
 #include <netdb.h>	// getaddrinfo
 #include <signal.h>	// kill
@@ -422,6 +423,19 @@ static int ll_lstat(lua_State *L) {
 	}
 	return 1;
 }//ll_lstat
+
+static int ll_utime(lua_State *L) {
+	// lua api:  utime(pathname, time) => true | nil, errno
+	// set file atime and mtime
+	// time is optional (defaults to current time)
+	//
+	const char *pname = luaL_checkstring(L, 1);
+	long long time = luaL_optinteger(L, 2, -1);
+	struct utimbuf times;
+	times.actime = time;
+	times.modtime = time;
+	return int_or_errno(L, utime(pname, (time==-1) ? NULL : &times));
+}
 
 static int ll_chown(lua_State *L) {
 	// lua api:  chown(pathname, uid, gid) => true | nil, errno
@@ -848,6 +862,7 @@ static const struct luaL_Reg l5lib[] = {
 	{"readlink", ll_readlink},
 	{"lstat3", ll_lstat3},
 	{"lstat", ll_lstat},
+	{"utime", ll_utime},
 	{"chown", ll_chown},
 	{"chmod", ll_chmod},
 	{"symlink", ll_symlink},
