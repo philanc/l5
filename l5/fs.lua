@@ -41,7 +41,8 @@ local typetbl = {
 	--[14]= "w",	--whiteout (only bsd? and/or codafs? => ignore it)
 }
 
-local function typestr(ft)
+function fs.typestr(ft)
+	-- convert the numeric file type into a one-letter string
 	return typetbl[ft] or "u" --unknown
 end
 
@@ -61,45 +62,24 @@ fs.attribute_ids = {
 	ctime = 13,
 }
 
-local function get_mode(what)
-	-- return the mode attribute of a file
-	-- if 'what' is a string, it is the file path
-	-- if 'what' is a table, it is the file stat table
-	-- if 'what' is an integer, it is the file 'mode' itself
-	local mode
-	if type(what) == "string" then mode = l5.lstat(what, 3)
-	elseif type(what) == "table" then mode = what[3]
-	else mode = what --assume this is an integer
-	end
-	return mode
+function fs.mtype(mode)
+	-- return the file type of a file given its 'mode' attribute
+	return (mode >> 12) & 0x1f
 end
 
-function fs.type(f)
-	-- return the type of a file as a one-char string
-	-- 'f' is the file path. It can be replaced by the file stat table
-	-- or by the file 'mode' attribute
-	local mode = get_mode(f)
-	return typestr((mode >> 12) & 0x1f)
+function fs.mperm(mode) 
+	-- get the access permissions of a file given its 'mode' attribute
+	return mode & 0x0fff
 end
 
-function fs.perm(f) 
-	-- get the access permissions of a file
-	-- 'f' is the file path. It can be replaced by the file stat table
-	-- or by the file 'mode' attribute
-	-- return the permissions as an integer
-	return get_mode(what) & 0x0fff
+function fs.mpermo(mode) 
+	-- get the access permissions of a file given its 'mode' attribute
+	-- return the octal representation of permissions as a four-digit
+	-- string, eg. "0755", "4755", "0600", etc.
+	return strf("%04o", mode & 0x0fff) 
 end
 
-function fs.operm(what) 
-	-- eget the access permissions of a file
-	-- 'f' is the file path. It can be replaced by the file stat table
-	-- or by the file 'mode' attribute
-	-- return the octal representation of permissions as a string
-	-- eg. "0755", "4755", "0600", etc.
-	return strf("%04o", get_mode(what) & 0x0fff) 
-end
-
-function fs.mexec(mode) 
+function fs.mexec(mode) -- !!! will probably remove this function 
 	-- return true if file is a regular file and executable
 	-- (0x49 == 0o0111)
 	-- note: true if executable "by someone" --maybe not by the caller!!
@@ -133,31 +113,39 @@ function fs.stat3(fpath)
 	-- return file type, size, mtime | nil, errmsg
 	local mode, size, mtime = l5.lstat3(fpath)
 	if not mode then return nil, errm(size, "stat3") end
-	local ftype = typestr((mode >> 12) & 0x1f)
+	local ftype = (mode >> 12) & 0x1f
 	return ftype, size, mtime
 end
 
 function fs.fsize(fpath)
-	local mode, size, mtime = l5.lstat3(fpath)
-	if not mode then return nil, errm(size, "stat3") end
-	return size
+	return fs.attr(fpath, 'size')
+end
+
+function fs.mtime(fpath)
+	return fs.attr(fpath, 'mtime')
 end
 
 ------------------------------------------------------------------------
 -- directories
 
 function fs.dirmap(dirpath, func, t)
-	-- map func over the directory
-	-- collect func results in table t
-	-- return the table.
-	-- func signature: func(t, fname, ftype, dirpath) 
+	-- map func over the directory  ("." and ".." are ignored)
+	-- func signature: func(fname, ftype, t, dirpath)
+	-- t is a table passed to func. It defaults to {}
+	-- func should return true if the iteration is to continue.
+	-- if func returns nil, err then iteration stops, and dirmap 
+	-- returns nil, err.
+	-- dirmap() returns t after directory iteration
+	-- in case of opendir or readdir error, dirmap returns nil, errno
 	-- 
+	t = t or {}
 	local dp = (dirpath == "") and "." or dirpath
 	-- (note: keep dp and dirpath distinct. it allows to have an 
 	-- empty prefix instead of "./" for find functions)
 	--
 	local dh, eno = l5.opendir(dp)
-	if not dh then return nil, errm(eno, "opendir") end
+	if not dh then return nil, eno end
+	local r
 	while true do
 		local fname, ftype = l5.readdir(dh)
 		if not fname then
@@ -167,8 +155,14 @@ function fs.dirmap(dirpath, func, t)
 				l5.closedir(dh)
 				return nil, errm(eno, "readdir")
 			end
+		elseif fname == "." or fname == ".." then
+			-- continue
 		else
-			func(t, fname, ftype, dirpath)
+			r, eno = func(fname, ftype, t, dirpath)
+			if not r then
+				l5.closedir(dh)
+				return nil, errm(eno, "readdir")
+			end
 		end
 	end
 	l5.closedir(dh)
@@ -178,14 +172,14 @@ end
 function fs.ls0(dirpath)
 	local tbl = {}
 	return fs.dirmap(dirpath, 
-		function(t, fname, ftype) insert(t, fname) end,
+		function(fname, ftype, t) insert(t, fname) end,
 		tbl)
 end
 
 function fs.ls1(dirpath)
 	-- ls1(dp) => { {name, type}, ... }
 	local tbl = {}
-	return fs.dirmap(dirpath, function(t, fname, ftype) 
+	return fs.dirmap(dirpath, function(fname, ftype, t) 
 		insert(t, {fname, typestr(ftype)}) 
 		end, 
 		tbl)
@@ -193,22 +187,26 @@ end
 
 function fs.ls3(dirpath)
 	-- ls3(dp) => { {name, type, size, mtime}, ... }
-	local ls3 = function(t, fname, ftype, dirpath)
+	local ls3 = function(fname, ftype, t, dirpath)
 		local fpath = fs.makepath(dirpath, fname)
 		local mode, size, mtime = l5.lstat3(fpath)
-		insert(t, {fname, typestr(ftype), size, mtime})	
+		insert(t, {fname, ftype, size, mtime})	
+		return true
 	end
 	return fs.dirmap(dirpath, ls3, {})
 end
 
-function fs.lsd(dirpath)
-	-- return dirlist, filelist
-	local lsd = function(t, fname, ftype, dirpath)
-		insert(t[ftype==4 and 1 or 2], fname)
+function fs.lsdfo(dirpath)
+	-- return directory list, regular filelist, other files list
+	local lsdfo = function(fname, ftype, t, dirpath)
+		insert(t[ (ftype == 4 and 1)
+			  or (ftype == 8 and 2)
+			  or 3], fname)
+		return true
 	end
-	local t, em = fs.dirmap(dirpath, lsd, {{}, {}})
+	local t, em = fs.dirmap(dirpath, lsdfo, {{}, {}, {}})
 	if not t then return nil, em end
-	return t[1], t[2]
+	return t[1], t[2], t[3]
 end
 
 function fs.findfiles(dirpath)
@@ -225,7 +223,7 @@ function fs.findfiles(dirpath)
 		for j, f in ipairs(ffl) do
 			insert(fl, f)
 		end
-		::continue::
+	::continue::
 	end
 	return fl
 end
