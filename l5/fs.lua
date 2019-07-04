@@ -15,7 +15,7 @@ local errm, rpad, pf, px = util.errm, util.rpad, util.pf, util.px
 
 
 ------------------------------------------------------------------------
--- fs function
+-- path utilities
 
 fs = {}
 
@@ -27,6 +27,7 @@ function fs.makepath(dirname, name)
 	return dirname .. '/' .. name
 end
 
+------------------------------------------------------------------------
 -- file types and attributes
 
 
@@ -91,6 +92,7 @@ function fs.lstat(fpath, tbl, statflag)
 	-- tbl is optional. it defaults to a new empty table
 	-- return tbl
 	-- if statflag is true, stat() is used instead of lstat()
+	-- (defaults to using lstat)
 	statflag = statflag and 1 or nil
 	tbl = tbl or {}
 	return l5.lstat(fpath, tbl, statflag) 
@@ -101,6 +103,7 @@ function fs.attr(fpath, attr_name, statflag)
 	-- fpath can be replaced by the table returned by lstat()
 	-- for the file. attr_name is the name of the attribute.
 	-- if statflag is true, stat() is used instead of lstat()
+	-- (defaults to using lstat)
 	local attr_id = fs.attribute_ids[attr_name] 
 		or error("unknown attribute name")
 	if type(fpath) == "table" then return fpath[attr_id] end
@@ -108,16 +111,18 @@ function fs.attr(fpath, attr_name, statflag)
 	return l5.lstat(fpath, attr_id, statflag)
 end	
 
-function fs.stat3(fpath)
+function fs.lstat3(fpath, statflag)
 	-- get useful attributes without filling a table:
 	-- return file type, size, mtime | nil, errmsg
-	local mode, size, mtime = l5.lstat3(fpath)
+	-- if statflag is true, stat() is used instead of lstat()
+	-- (defaults to using lstat)	
+	local mode, size, mtime = l5.lstat3(fpath, statflag)
 	if not mode then return nil, errm(size, "stat3") end
 	local ftype = (mode >> 12) & 0x1f
 	return ftype, size, mtime
 end
 
-function fs.fsize(fpath)
+function fs.size(fpath)
 	return fs.attr(fpath, 'size')
 end
 
@@ -196,59 +201,61 @@ function fs.ls3(dirpath)
 	return fs.dirmap(dirpath, ls3, {})
 end
 
-function fs.lsdfo(dirpath)
-	-- return directory list, regular filelist, other files list
-	local lsdfo = function(fname, ftype, t, dirpath)
-		insert(t[ (ftype == 4 and 1)
-			  or (ftype == 8 and 2)
-			  or 3], fname)
+function fs.lsdf(dirpath)
+	-- return directory list, other files list
+	local lsdf = function(fname, ftype, t, dirpath)
+		insert(t[ftype == 4 and 1 or 2], fname)
 		return true
 	end
-	local t, em = fs.dirmap(dirpath, lsdfo, {{}, {}, {}})
+	local t, em = fs.dirmap(dirpath, lsdf, {{}, {}})
 	if not t then return nil, em end
-	return t[1], t[2], t[3]
+	return t[1], t[2]
 end
 
-function fs.findfiles(dirpath)
+function fs.findall(dirpath, predicate, notflag)
 	-- find (recursively) files in dirpath. return a list of file paths
-	local dl, fl = fs.lsd(dirpath)
-	if not dl then return nil, fl end
-	for i, f in ipairs(fl) do
-		fl[i] = fs.makepath(dirpath, f)
+	-- for which predicate is true.
+	-- predicate signature: p(fpath, ftype) => true or false value
+	-- if predicate is a string, it is considered as a Lua pattern,
+	-- the predicate used is a match function.
+	-- notflag is optional. if true, the predicate result is negated.
+	if type(predicate) == "string" then
+		local pattern = predicate
+		predicate = function(fp, ft) return (fp:match(pattern)) end
 	end
-	for i, d in ipairs(dl) do
-		if d == "." or d == ".." then goto continue end
-		local ffl, em = fs.findfiles(fs.makepath(dirpath, d))
-		if not ffl then return nil, em end
-		for j, f in ipairs(ffl) do
-			insert(fl, f)
+	local t = {} -- used to collect file paths
+	t.errors = {} -- use to collect directory errors (usually no perm.)
+	local function rec(fname, ftype, t, dirpath)
+		local r, eno
+		local p = fs.makepath(dirpath, fname)
+		r = not predicate or predicate(p, ftype) 
+		if notflag then r = not r end
+		if r then insert(t, p)	end
+--~ 		print("REC", fname, ftype)
+		if ftype == 4 then 
+--~ 			print("RECURSE into", p)
+			local subdir = p -- recurse into subdir
+			r, eno = fs.dirmap(subdir, rec, t)
+			if not r then 
+				insert(t,errors, errm(eno, p)) 
+			end
 		end
-	::continue::
-	end
-	return fl
+		return true
+		end
+	return fs.dirmap(dirpath, rec, t)
 end
 
-function fs.findall(dirpath)
-	-- find (recursively) files and dirs in dirpath. 
-	-- return a list of file and dir paths
-	local dl, fl = fs.lsd(dirpath)
-	if not dl then return nil, fl end
-	for i, f in ipairs(fl) do --replace file names with file paths
-		fl[i] = fs.makepath(dirpath, f)
-	end
-	for i, d in ipairs(dl) do
-		if d == "." or d == ".." then goto continue end
-		local dp = fs.makepath(dirpath, d)
-		insert(fl, dp) -- append dir paths to file list
-		local ffl, em = fs.findfiles(dp) -- recurse into dir
-		if not ffl then return nil, em end
-		for j, f in ipairs(ffl) do
-			insert(fl, f)
+function fs.findfiles(dirpath, predicate, notflag)
+	-- same as findall, but does not include directories
+	local pred = function(fname, ftype) 
+		if ftype == 4 then return false end
+		if type(predicate) == "string" then
+			return (fp:match(predicate)) 
 		end
-		::continue::
 	end
-	return fl
+	return fs.findall(dirpath, pred, notflag)
 end
+
 
 ------------------------------------------------------------------------
 -- some useful mount options
