@@ -130,8 +130,20 @@ function fs.mtime(fpath)
 	return fs.attr(fpath, 'mtime')
 end
 
+function fs.touch(fpath, time)
+	-- change file mtime and atime attribute (utime() syscall)
+	-- time is optional. If time is not provided, current time is used.
+	return l5.utime(fpath, time)
+end
+
+
 ------------------------------------------------------------------------
 -- directories
+
+fs.getcwd = l5.getcwd	-- return current directory as a string
+fs.chdir = l5.chdir	-- change current directory
+
+-- directory iteration
 
 function fs.dirmap(dirpath, func, t)
 	-- map func over the directory  ("." and ".." are ignored)
