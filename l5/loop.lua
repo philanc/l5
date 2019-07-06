@@ -1,6 +1,14 @@
 -- Copyright (c) 2019  Phil Leblanc  -- see LICENSE file
 ------------------------------------------------------------------------
--- L5 loop functions
+
+--[[
+
+l5 loop device functions
+
+
+
+
+]]
 
 
 local l5 = require "l5"
