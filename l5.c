@@ -650,11 +650,16 @@ static int ll_accept(lua_State *L) {
 	// lua_api: accept(fd, flags) => cfd
 	// this uses the accept4() variant of accept(), allowing to pass
 	// flags for the new socket creation. flags defaults to 0.
+	// return (client fd, client sockaddr), or (nil, errmsg)
 	int fd = luaL_checkinteger(L, 1);
 	int flags = luaL_optinteger(L, 2, 0);
 	struct sockaddr addr;
 	socklen_t len = sizeof(addr); //enough for ip4&6 addr
-	return int_or_errno(L, accept4(fd, &addr, &len, flags));
+	int cfd = accept4(fd, &addr, &len, flags);
+	if (cfd == -1) return nil_errno(L);
+	lua_pushinteger(L, cfd);
+	lua_pushlstring(L, (const char *)&addr, len);
+	return 2;
 }
 
 static int ll_connect(lua_State *L) {
