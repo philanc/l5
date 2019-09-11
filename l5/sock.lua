@@ -29,8 +29,15 @@ Notes:
 sock = {}
 
 sock.DONTWAIT = 0x40  -- non-blocking flag for send/recv functions
+sock.BUFSIZE = 4096  -- max size of a msg for send1/recv1 functions
 sock.BUFSIZE1 = 1280  -- max size of a msg for send1/recv1 functions
 
+local SOCK_STREAM = 0x01
+local SOCK_DGRAM = 0x02
+local SOCK_CLOEXEC = 0x80000
+local SOCK_NONBLOCK = 0x0800
+
+local EAGAIN = 11 -- same as EWOULDBLOCK (on linux and any recent unix)
 
 function sock.parse_ipv4_sockaddr(sockaddr)
 	-- return ipv4 address as a string and port as a number
@@ -84,19 +91,20 @@ function sock.make_sockaddr(addr, port)
 	end
 end
 
-function sock.sbind(addr, port, backlog)
+function sock.sbind(addr, port, nonblocking, backlog)
 	-- create a stream socket, bind it, and start listening
 	-- socket is ipv4, or unix if port is empty
 	-- default options: CLOEXEC, blocking, REUSEADDR
+	-- if nonblocking is true, the socket is non-blocking
 	-- backlog is the backlog size for listen(). it defaults to 32.
 	-- return the socket fd, or nil, errmsg
 	backlog = backlog or 32
 	local sockaddr, em = sock.make_sockaddr(addr, port)
 	if not sockaddr then return nil, em end
 	local family = port and 2 or 1
-	-- sock type: SOCK_STREAM = 0x00000001, SOCK_CLOEXEC = 0x80000
-	local type = 0x80001
-	local fd, eno = l5.socket(family, type, 0)
+	local sotype = SOCK_STREAM | SOCK_CLOEXEC
+	if nonblocking then sotype = sotype | SOCK_NONBLOCK end
+	local fd, eno = l5.socket(family, sotype, 0)
 	if not fd then return nil, errm(eno, "socket") end
 	local r
 	local SOL_SOCKET = 1
@@ -110,16 +118,17 @@ function sock.sbind(addr, port, backlog)
 	return fd
 end
 
-function sock.sconnect(addr, port)
+function sock.sconnect(addr, port, nonblocking)
 	-- create a stream socket, and connect it.
 	-- socket is ipv4, or unix if port is empty
+	-- if nonblocking is true, the socket is non-blocking
 	-- default options: CLOEXEC, blocking
 	-- return the socket fd, or nil, errmsg
 	local sockaddr, em = sock.make_sockaddr(addr, port)
 	if not sockaddr then return nil, em end
 	local family = port and 2 or 1
-	-- sock type: SOCK_STREAM = 0x00000001, SOCK_CLOEXEC = 0x80000
-	local type = 0x80001
+	local sotype = SOCK_STREAM | SOCK_CLOEXEC
+	if nonblocking then sotype = sotype | SOCK_NONBLOCK end
 	local fd, eno = l5.socket(family, type, 0)
 	if not fd then return nil, errm(eno, "socket") end
 	local r
@@ -128,11 +137,13 @@ function sock.sconnect(addr, port)
 	return fd
 end
 
-function sock.dsocket(family)
+function sock.dsocket(family, nonblocking)
 	-- create a datagram socket, return the fd
 	-- family is 1 (unix), 2 (ip4) or 10 (ip6)
-	-- SOCK_DGRAM = 2, SOCK_CLOEXEC = 0x80000 => type = 0x80002
-	local fd, eno = l5.socket(family, 0x80002, 0)
+	-- if nonblocking is true, the socket is non-blocking
+	local sotype = SOCK_DGRAM | SOCK_CLOEXEC
+	if nonblocking then sotype = sotype | SOCK_NONBLOCK end
+	local fd, eno = l5.socket(family, sotype, 0)
 	if not fd then return nil, errm(eno, "socket") end
 	return fd
 end
@@ -140,10 +151,10 @@ end
 
 -- dso convenience object (wrap a datagram socket)
 
-function sock.newdso(family)
+function sock.newdso(family, nonblocking)
 	-- family = 1 for unix, 2 for inet, 10 for inet6
 	local eno, em, fd, sa, r
-	local dso = { family = family }
+	local dso = { family = family, nonblocking = nonblocking }
 	--
 	function dso.bind(dso, addr, port)
 		if dso.family == 1 then
@@ -172,7 +183,7 @@ function sock.newdso(family)
 	--
 	function dso.close(dso) return l5.close(dso.fd) end
 	--
-	dso.fd, em = sock.dsocket(dso.family)
+	dso.fd, em = sock.dsocket(dso.family, nonblocking)
 	if not dso.fd then return nil, em end
 	return dso
 end
@@ -192,7 +203,7 @@ function sock.newsso(fd)
 		return sso
 	end
 	--
-	function sso.bind(sso, addr, port)
+	function sso.bind(sso, addr, port, nonblocking)
 		sso.fd, em = sock.sbind(addr, port)
 		if not sso.fd then return nil, em end
 		return sso

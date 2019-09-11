@@ -10,6 +10,9 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 
 #define L5_VERSION "L5-0.2"
 
+// _GNU_SOURCE needed in glibc to declare accept4() in sys/socket.h
+#define _GNU_SOURCE  	
+
 #include <stdlib.h>	// setenv
 #include <stdio.h>
 #include <string.h>
@@ -25,6 +28,8 @@ This is for Lua 5.3+ only, built with default 64-bit integers
 #include <poll.h>	// poll
 #include <time.h>	// nanosleep
 #include <utime.h>	// utime
+
+ 
 #include <sys/socket.h>	// socket..
 #include <netdb.h>	// getaddrinfo
 #include <signal.h>	// kill
@@ -642,11 +647,14 @@ static int ll_listen(lua_State *L) {
 }
 
 static int ll_accept(lua_State *L) {
-	// lua_api: accept(fd) => cfd
+	// lua_api: accept(fd, flags) => cfd
+	// this uses the accept4() variant of accept(), allowing to pass
+	// flags for the new socket creation. flags defaults to 0.
 	int fd = luaL_checkinteger(L, 1);
+	int flags = luaL_optinteger(L, 2, 0);
 	struct sockaddr addr;
 	socklen_t len = sizeof(addr); //enough for ip4&6 addr
-	return int_or_errno(L, accept(fd, &addr, &len));
+	return int_or_errno(L, accept4(fd, &addr, &len, flags));
 }
 
 static int ll_connect(lua_State *L) {

@@ -44,6 +44,7 @@ function loop.filename(devname)
 end
 
 function loop.remove(devname)
+	-- remove the loop device
 	local LOOP_CLR_FD = 0x4C01
 	local fd, eno, s
 	fd, eno = l5.open(devname, 0, 0)
@@ -55,6 +56,7 @@ function loop.remove(devname)
 end
 
 function loop.setup(devname, filename, ro_flag)
+	-- setup the loop device
 	-- default flags is O_RDWR(2)
 	local flags = ro_flag and 0 or 2  -- 0=O_RDONLY, 2=O_RDWR
 	local LOOP_SET_FD = 0x4C00
@@ -87,6 +89,7 @@ function loop.setup(devname, filename, ro_flag)
 	if em then return nil, eno, em end
 	return true
 end
+
 
 ------------------------------------------------------------------------
 return loop	
