@@ -232,6 +232,11 @@ static int ll_close(lua_State *L) {
 	return int_or_errno(L, close(fd));
 }
 
+static int ll_fsync(lua_State *L) {
+	int fd = luaL_checkinteger(L, 1);
+	return int_or_errno(L, fsync(fd));
+}
+
 static int ll_read(lua_State *L) { 
 	// lua api:  read(fd [, cnt]) => str
 	// attempt to read cnt bytes 
@@ -862,6 +867,7 @@ static const struct luaL_Reg l5lib[] = {
 	//
 	{"open", ll_open},
 	{"close", ll_close},
+	{"fsync", ll_fsync},
 	{"read", ll_read},
 	{"write", ll_write},
 	{"dup2", ll_dup2},
