@@ -1,6 +1,6 @@
 -- Copyright (c) 2019  Phil Leblanc  -- see LICENSE file
 ------------------------------------------------------------------------
--- L5 socket functions
+-- L5 - socket interface
 
 
 local l5 = require "l5"
@@ -16,17 +16,58 @@ local errm, rpad, pf, px = util.errm, util.rpad, util.pf, util.px
 
 Notes:
 
-  
+
 
 
 
 ]]
 
+sock = {} -- the sock module object
 
 ------------------------------------------------------------------------
--- sock functions
+-- sockaddr ("sa") utilities
 
-sock = {}
+local AF_UNIX, AF_INET, AF_INET6 = 1, 2, 10
+
+function sock.sockaddr(addr, port)
+	-- turn an address (as a string) and a port number
+	-- into a sockaddr struct, returned as a string
+	-- addr is either an ip v4 numeric address (eg. "1.23.34.56")
+	-- or a unix socket pathname (eg. "/tmp/xyz_socket")
+	-- (in the case of a Unix socket, the pathname must include a '/')
+	local sa
+	if addr:find("/") then --assume this is an AF_UNIX socket
+		if #addr > 107 then return nil, "pathname too long" end
+		return spack("=Hz", AF_UNIX, addr)
+	end
+	-- ipv6 addr not supported yet
+	-- if addr:find(":") then --assume this is an AF_INET6 socket
+	-- end
+
+	-- here, assume this is an ipv4 address
+	local ippat = "(%d+)%.(%d+)%.(%d+)%.(%d+)"
+	local ip1, ip2, ip3, ip4 = addr:match(ippat)
+	ip1 = tonumber(ip1); ip2 = tonumber(ip2);
+	ip3 = tonumber(ip3); ip4 = tonumber(ip4);
+	local function bad(b) return b < 0 or b > 255 end
+	if not ip1 or bad(ip1) or bad(ip2) or bad(ip3) or bad(ip4) then
+		return nil, "invalid address"
+	end
+	if (not math.type(port) == "integer")
+		or port <=0 or port > 65535 then
+		return nil, "not a valid port"
+	end
+	return spack("<H>HBBBBI8", AF_INET, port, ip1, ip2, ip3, ip4, 0)
+end
+
+function sock.sockaddr_family(sa)
+	return sunpack("<H", sa)
+end
+
+------------------------------------------------------------------------
+-- so functions and constants
+
+
 
 sock.DONTWAIT = 0x40  -- non-blocking flag for send/recv functions
 sock.BUFSIZE = 4096  -- max size of a msg for send1/recv1 functions
@@ -38,284 +79,252 @@ local SOCK_CLOEXEC = 0x80000
 local SOCK_NONBLOCK = 0x0800
 
 local EAGAIN = 11 -- same as EWOULDBLOCK (on linux and any recent unix)
+local EBUSY = 16
 
-function sock.parse_ipv4_sockaddr(sockaddr)
-	-- return ipv4 address as a string and port as a number
-	-- or nil, errmsg if family is not AF_INET (2) or length is not 16
-	-- 
-	if #sockaddr ~= 16 then 
-		return nil, "bad length"
-	end
-	local family, port, ip1, ip2, ip3, ip4 = 	
-		sunpack("<H>HBBBB", sockaddr)
-	if family ~= 2 then 
-		return nil, "not an IPv4 address"
-	end
-	local ipaddr = table.concat({ip1, ip2, ip3, ip4}, '.')
-	return ipaddr, port
-end --parse_ipv4_sockaddr
+sock.EAGAIN = EAGAIN
+sock.EOF     = 0x10000	-- outside of the range of errno numbers
+sock.TIMEOUT = 0x10001	
 
-function sock.make_ipv4_sockaddr(ipaddr, port)
-	-- ipaddr: a numeric ip address as a string
-	-- port: a port number as an integer
-	-- return a sockaddr string or nil, errmsg
-	local ippat = "(%d+)%.(%d+)%.(%d+)%.(%d+)"
-	local ip1, ip2, ip3, ip4 = ipaddr:match(ippat)
-	ip1 = tonumber(ip1); ip2 = tonumber(ip2); 
-	ip3 = tonumber(ip3); ip4 = tonumber(ip4); 
-	local function bad(b) return b < 0 or b > 255 end 
-	if not ip1 or bad(ip1) or bad(ip2) or bad(ip3) or bad(ip4) then 
-		return nil, "not an IPv4 address"
-	end
-	if (not math.type(port) == "integer") 
-		or port <=0 or port > 65535 then 
-		return nil, "not a valid port"
-	end
-	return spack("<H>HBBBBI8", 2, port, ip1, ip2, ip3, ip4, 0)
-end
 
-function sock.make_unix_sockaddr(pathname)
-	if #pathname > 107 then return nil, "out of range" end
-	local soaddr = spack("=Hz", 1, pathname); --AF_UNIX=1
---~ 	soaddr = rpad(soaddr, 110, '\0')
-	return soaddr
-end
-
-function sock.make_sockaddr(addr, port)
-	-- return a sockaddr (ipv4, or unix if port is empty)
-	local sa, em
-	if not port then 
-		return sock.make_unix_sockaddr(addr)
-	else
-		return sock.make_ipv4_sockaddr(addr, port)
-	end
-end
-
-function sock.sbind(addr, port, nonblocking, backlog)
-	-- create a stream socket, bind it, and start listening
-	-- socket is ipv4, or unix if port is empty
+function sock.sbind(sa, nonblocking, backlog)
+	-- create a stream socket object, bind it to sockaddr sa,
+	-- and start listening.
 	-- default options: CLOEXEC, blocking, REUSEADDR
+	-- sa is a sockaddr struct encoded as a string (see sockaddr())
 	-- if nonblocking is true, the socket is non-blocking
 	-- backlog is the backlog size for listen(). it defaults to 32.
-	-- return the socket fd, or nil, errmsg
-	backlog = backlog or 32
-	local sockaddr, em = sock.make_sockaddr(addr, port)
-	if not sockaddr then return nil, em end
-	local family = port and 2 or 1
+	-- return the socket object, or nil, errmsg
+	local so = { 
+		nonblocking = nonblocking, 
+		backlog = backlog or 32, 
+		stream = true,
+		bindto = sa,
+	}
+	local family = sock.sockaddr_family(sa)
 	local sotype = SOCK_STREAM | SOCK_CLOEXEC
 	if nonblocking then sotype = sotype | SOCK_NONBLOCK end
 	local fd, eno = l5.socket(family, sotype, 0)
-	if not fd then return nil, errm(eno, "socket") end
+	if not fd then return nil, eno, "socket" end
+	so.fd = fd
 	local r
 	local SOL_SOCKET = 1
-	local SO_KEEPALIVE = 9
-	r, eno = l5.setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, 1)
-	if not r then return nil, errm(eno, "setsockopt") end
-	r, eno = l5.bind(fd, sockaddr)
-	if not r then return nil, errm(eno, "bind") end
-	r, eno = l5.listen(fd, backlog)
-	if not r then return nil, errm(eno, "listen") end
-	return fd
+	local SO_REUSEADDR = 2
+	r, eno = l5.setsockopt(so.fd, SOL_SOCKET, SO_REUSEADDR, 1)
+	if not r then return nil, eno, "setsockopt" end
+	r, eno = l5.bind(so.fd, sa)
+	if not r then return nil, eno, "bind" end
+	r, eno = l5.listen(so.fd, so.backlog)
+	if not r then return nil, eno, "listen" end
+	return so
 end
 
-function sock.sconnect(addr, port, nonblocking)
-	-- create a stream socket, and connect it.
-	-- socket is ipv4, or unix if port is empty
+function sock.sconnect(sa, nonblocking)
+	-- create a stream socket object, and connect it to server 
+	-- address sa. sa is a sockaddr string
 	-- if nonblocking is true, the socket is non-blocking
 	-- default options: CLOEXEC, blocking
-	-- return the socket fd, or nil, errmsg
-	local sockaddr, em = sock.make_sockaddr(addr, port)
-	if not sockaddr then return nil, em end
-	local family = port and 2 or 1
+	-- return the socket object, or nil, eno, errmsg
+	local so = { 
+		nonblocking = nonblocking, 
+		stream = true,
+		ssa = sa
+	}
+	local family = sock.sockaddr_family(sa)
 	local sotype = SOCK_STREAM | SOCK_CLOEXEC
 	if nonblocking then sotype = sotype | SOCK_NONBLOCK end
-	local fd, eno = l5.socket(family, type, 0)
-	if not fd then return nil, errm(eno, "socket") end
+	local fd, eno = l5.socket(family, sotype, 0)
+	if not fd then return nil, eno, "socket" end
+	so.fd = fd
 	local r
-	r, eno = l5.connect(fd, sockaddr)
-	if not r then return nil, errm(eno, "connect") end
-	return fd
+	r, eno = l5.connect(fd, sa)
+	if not r then return nil, eno, "connect" end
+	return so
 end
 
 function sock.dsocket(family, nonblocking)
-	-- create a datagram socket, return the fd
+	-- create a datagram socket object, return the fd
 	-- family is 1 (unix), 2 (ip4) or 10 (ip6)
 	-- if nonblocking is true, the socket is non-blocking
+	local so = { 
+		nonblocking = nonblocking, 
+		stream = false,
+		family = family,
+	}
 	local sotype = SOCK_DGRAM | SOCK_CLOEXEC
 	if nonblocking then sotype = sotype | SOCK_NONBLOCK end
 	local fd, eno = l5.socket(family, sotype, 0)
-	if not fd then return nil, errm(eno, "socket") end
-	return fd
+	if not fd then return nil, eno, "socket" end
+	so.fd = fd
+	return so
 end
 
-
--- dso convenience object (wrap a datagram socket)
-
-function sock.newdso(family, nonblocking)
-	-- family = 1 for unix, 2 for inet, 10 for inet6
-	local eno, em, fd, sa, r
-	local dso = { family = family, nonblocking = nonblocking }
-	--
-	function dso.bind(dso, addr, port)
-		if dso.family == 1 then
-			sa, em = sock.make_unix_sockaddr(addr)
-		else
-			sa, em = sock.make_ipv4_sockaddr(addr, port)
-		end
-		if not sa then return nil, em end
-		dso.sa = sa
-		-- bind the socket to the address
-		r, eno = l5.bind(dso.fd, sa)
-		if not r then return nil, errm(eno, "bind") end
-		return dso
-	end
-	--
-	function dso.recv(dso, flags)
-		flags = flags or 0
-		return l5.recvfrom(dso.fd, flags)
-	end
-	--
-	function dso.send(dso, str, dest, flags)
-		-- #str must be < sock.BUFSIZE1
-		flags = flags or 0
-		return l5.sendto(dso.fd, str, flags, dest)
-	end
-	--
-	function dso.close(dso) return l5.close(dso.fd) end
-	--
-	dso.fd, em = sock.dsocket(dso.family, nonblocking)
-	if not dso.fd then return nil, em end
-	return dso
+function sock.bind(so, sa)
+	-- bind a socket to an address (in sockaddr string form - 
+	-- see sock.sockaddr())
+	local r, eno = l5.bind(so.fd, sa)
+	if not r then return nil, eno end
+	so.sa = sa
+	return true
 end
 
--- sso convenience object (wrap a stream socket)
+	
+function sock.recv(so)
+	return l5.recv(so.fd, 0)
+end
 
-function sock.newsso(fd)
-	-- create a sso object. fd is optional 
-	-- (it is used for the accept() method)
-	local eno, em, sa, r
-	local sso = {}
-	if fd then sso.fd = fd end
-	--
-	function sso.timeout(sso, ms)
-		local r, eno = l5.setsocktimeout(sso.fd, ms)
-		if not r then return nil, errm(eno, "setsocktimeout") end
-		return sso
-	end
-	--
-	function sso.bind(sso, addr, port, nonblocking)
-		sso.fd, em = sock.sbind(addr, port)
-		if not sso.fd then return nil, em end
-		return sso
-	end
-	--
-	function sso.connect(sso, addr, port)
-		sso.fd, em = sock.sconnect(addr, port)
-		if not sso.fd then return nil, em end
-		return sso
-	end
-	--
-	function sso.accept(sso)
-		local cfd, eno = l5.accept(sso.fd)
-		if not cfd then return nil, errm(eno, "accept") end
-		-- return a new client sso object
-		return sock.newsso(cfd)
-	end
-	--
-	function sso.readline(sso)
-		-- buffered read. read a line
-		-- return line (without eol) or nil, errmsg
-		local eno -- errno
-		sso.buf = sso.buf or "" -- read buffer
-		sso.bi = sso.bi or 1 -- buffer index
-		while true do
-			local i, j = sso.buf:find("\r?\n", sso.bi)
-			if i then -- NL found. return the line
-				local l = sso.buf:sub(sso.bi, i-1)
-				sso.bi = j + 1
-				return l
-			else -- NL not found. read more bytes into buf
-				local b, eno = l5.read(sso.fd)
-				if not b then 
-					return nil, errm(eno, "read") 
-				end
+function sock.recvfrom(so)
+	return l5.recvfrom(so.fd, 0)
+end
+
+function sock.sendto(so, msg, dest_sa)
+	assert(#msg <= sock.BUFSIZE)
+	return l5.sendto(so.fd, msg, 0, dest_sa)
+end
+
+function sock.close(so) 
+	return l5.close(so.fd)
+end
+
+function sock.timeout(so, ms)
+	local r, eno = l5.setsocktimeout(so.fd, ms)
+	if not r then return nil, eno, "setsocktimeout" end
+	return so
+end
+
+function sock.accept(so, nonblocking)
+	-- accept a connection on server socket object so
+	-- return cso, a socket object for the accepted client.
+	local flags = SOCK_CLOEXEC
+	if nonblocking then flags = flags | SOCK_NONBLOCK end
+	local cfd, csa = l5.accept(so.fd, flags)
+	if not cfd then return nil, csa end -- here csa is the errno.
+	local cso = { 
+		fd = cfd,
+		csa = csa,
+		nonblocking = nonblocking,
+		stream = true,
+	}
+	return cso
+end
+
+-- sock readbytes and readline functions: at the moment not very efficient
+-- (concat read string with buffer at each read operation - should
+-- replace the buf string with a table) -- to be optimized later! 
+
+function sock.readline(so)
+	-- buffered read. read a line
+	-- return line (without eol) or nil, errno
+	local eno -- errno
+	so.buf = so.buf or "" -- read buffer
+--~ 	so.bi = so.bi or 1 -- buffer index
+	while true do
+		local i, j = so.buf:find("\r?\n")
+		if i then -- NL found. return the line
+			local l = so.buf:sub(1, i-1)
+			so.buf = so.buf:sub(j + 1)
+			return l
+		else -- NL not found. read more bytes into buf
+			local b, eno = l5.read(so.fd)
+			if not b then
+				return nil, eno
+			end
 --~ 				print("READ", b and #b)
-				if #b == 0 then return nil, "EOF" end
-				sso.buf = sso.buf:sub(sso.bi) .. b
-			end--if	
-		end--while reading a line
-	end
-	--
-	function sso.readbytes(sso, n)
-		-- buffered read: read n bytes 
-		-- return read bytes as a string, or nil, errmsg
-		sso.buf = sso.buf or "" -- read buffer
-		sso.bi = sso.bi or 1 -- buffer index
-		local nbs -- "n bytes string" -- expected result
-		local nr -- number of bytes already read
-		local eno -- errno
-		-- rest to read in buf:
-		sso.buf = sso.buf:sub(sso.bi)
-		sso.bi = 1
-		nr = #sso.buf -- available bytes in bt
-		-- here, we have not enough bytes in buf
-		local bt = { sso.buf } -- collect more in table bt
-		while true do
-			if n <= nr then -- enough bytes in bt
-				sso.buf = table.concat(bt)
-				nbs = sso.buf:sub(1, n)
-				-- keep not needed bytes in buf
-				sso.buf = sso.buf:sub(n+1)
-				-- reset buffer index
-				sso.bi = 1
+			if #b == 0 then return nil, sock.EOF end
+			so.buf = so.buf .. b
+		end--if
+	end--while reading a line
+end
+
+function sock.readbytes(so, n)
+	-- buffered read: read n bytes
+	-- return read bytes as a string, or nil, errmsg
+	so.buf = so.buf or "" -- read buffer
+	local nbs -- "n bytes string" -- expected result
+	local eno -- errno
+	while true do
+		if n <= #so.buf then -- enough bytes in buf
+			nbs = so.buf:sub(1, n)
+			-- keep not needed bytes in buf
+			so.buf = so.buf:sub(n+1)
+			return nbs
+		else -- not enough, read more
+			local b, eno = l5.read(so.fd)
+			if not b then
+				return nil, eno
+			end
+			if #b == 0 then
+				--EOF, not enough bytes
+				-- return what we have
+				nbs = buf
+				so.buf = ""
 				return nbs
-			else -- not enough, read more
-				local b, eno = l5.read(sso.fd)
-				if not b then 
-					return nil, errm(eno, "read")
-				end
-				if #b == 0 then 
-					--EOF, not enough bytes
-					-- return what we have
-					nbs = table.concat(bt)
-					return nbs
-				end
-				nr = nr + #b
-				table.insert(bt, b)
 			end
-		end--while reading n bytes
-	end
-	--
-	function sso.read(sso, n)
-		-- buffered read: if n is provided then read n bytes 
-		-- else read a line
-		if n then return sso.readbytes(sso, n) end
-		return sso.readline(sso)
-	end
-	--
-	function sso.write(sso, str)
-		-- attempt to write blen bytes at a time
-		local blen = 16384
-		local i, slen = 1, #str
-		local n, eno
-		while i < slen do
-			if i + blen - 1 >= slen then 
-				blen = slen - i + 1 
-			end
-			n, eno = l5.write(sso.fd, str, i, blen)
-			if not n then return errm(eno, "write") end
-			i = i + n
+			so.buf = so.buf .. b
 		end
-		return slen
+	end--while reading n bytes
+end
+
+function sock.read(so, n)
+	-- buffered read: if n is provided then read n bytes
+	-- else read a line
+	if n then return sock.readbytes(so, n) end
+	return sock.readline(so)
+end
+
+function sock.write(so, str, idx, cnt)
+	-- write cnt bytes from string str at index idx fo socket object
+	-- return number of bytes actually written or nil, errno
+	-- idx, cnt default to 1, #str
+	return l5.write(so.fd, str, idx, cnt)
+end
+
+function sock.flush(so)
+	return l5.fsync(so.fd)
+end
+
+function sock.getpeername(so) 
+	return l5.getpeername(so.fd) 
+end
+
+function sock.getsockname(so) 
+	return l5.getsockname(so.fd) 
+end
+
+
+--[[     ???  MUST TCP WRITE BE BUFFERED ???
+
+-- with tcp socket, can I pass arbitrary long string to write(2)??
+-- or should I send smaller blocks one at a time?  what block size??
+
+function sock.write(so, str)
+	-- write string str to the socket object.
+	-- attempt to write at most BLEN bytes at a time.
+	-- the string to write is buffered. if str is not provided (nil),
+	-- write() attempts to continue writing the previously given string
+	-- (useful for coroutine-based concurrent socket I/O).
+	local BLEN = 16384
+	local i, slen = 1, #str
+	if str then 
+		if so.wbuf then return nil. EBUSY end
+		so.wbuf = str -- write buffer
+		so.wi = 1  -- write buffer index
+	end 
+	-- here attem
+	
+	local n, eno
+	while i < slen do
+		if i + BLEN - 1 >= slen then
+			BLEN = slen - i + 1
+		end
+		n, eno = l5.write(so.fd, str, i, BLEN)
+		if not n then return nil, eno end
+		i = i + n
 	end
-	--
-	function sso.close(sso) return l5.close(sso.fd) end
-	--
-	function sso.getpeername(sso) return l5.getpeername(sso.fd) end
-	function sso.getsockname(sso) return l5.getsockname(sso.fd) end
-	--
-	return sso
-end --sock.newsso()
+	return slen
+end
+]]
 
 ------------------------------------------------------------------------
 return sock
+
+
