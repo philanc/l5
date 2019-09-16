@@ -103,7 +103,8 @@ function fs.attr(fpath, attr_name, statflag)
 	-- fpath can be replaced by the table returned by lstat()
 	-- for the file. attr_name is the name of the attribute.
 	-- if statflag is true, stat() is used instead of lstat()
-	-- (defaults to using lstat)
+	-- (defaults to using lstat - statflag is of course ignored
+	--  when fpath is a table)
 	local attr_id = fs.attribute_ids[attr_name] 
 		or error("unknown attribute name")
 	if type(fpath) == "table" then return fpath[attr_id] end
@@ -178,7 +179,7 @@ function fs.dirmap(dirpath, func, t)
 			r, eno = func(fname, ftype, t, dirpath)
 			if not r then
 				l5.closedir(dh)
-				return nil, errm(eno, "readdir")
+				return nil, errm(eno, "dirmap func")
 			end
 		end
 	end
@@ -197,7 +198,8 @@ function fs.ls1(dirpath)
 	-- ls1(dp) => { {name, type}, ... }
 	local tbl = {}
 	return fs.dirmap(dirpath, function(fname, ftype, t) 
-		insert(t, {fname, typestr(ftype)}) 
+		insert(t, {fname, fs.typestr(ftype)}) 
+		return true
 		end, 
 		tbl)
 end
@@ -207,7 +209,7 @@ function fs.ls3(dirpath)
 	local ls3 = function(fname, ftype, t, dirpath)
 		local fpath = fs.makepath(dirpath, fname)
 		local mode, size, mtime = l5.lstat3(fpath)
-		insert(t, {fname, ftype, size, mtime})	
+		insert(t, {fname, fs.typestr(ftype), size, mtime})	
 		return true
 	end
 	return fs.dirmap(dirpath, ls3, {})

@@ -88,6 +88,7 @@ function test_stat()
 	mode, size, mtim = l5.lstat3(dn)
 --~ 	print('dir', mode, size)
 	assert((not mode) and size==2) -- here size == errno == ENOENT
+	os.remove("l5symlink")
 	print("test_stat: ok.")
 end
 
@@ -188,35 +189,26 @@ function test_fs()
 	dl, em = fs.ls3("/dev/mapper")
 	found = false
 	for i, e in ipairs(dl) do
---~ 		print(e[2], e[1], e[3], e[4]) -- ftype, fname, mtime, size
+--~ 		print('find devmapper', e[1], e[2], e[3], e[4]) -- fname, ftype, size, mtime
 		found = found or 
-			(e[1] == "control" and e[2] == "c" and e[4] == 0)
+			(e[1] == "control" and e[2] == "c" and e[3] == 0)
 	end
 	assert(found, "/dev/mapper/control not found")
-	dl, fl = fs.lsd("/bin")
+	--
+	-- test fs.lsdf(path) => dirlist, filelist 
+	dl, fl = fs.lsdf("/proc/sys/net/ipv4")
 	assert(dl, fl)
 	local dls, fls = concat(dl, " "), concat(fl, " ")
---~ 	print("dirs: ", ds, "\nfiles: ", fs)
-	assert(fls:find"bash", "bash not found in file list")
-	assert(dls:find"..", ".. not found in dir list")
---~ 	print("ls0 cur dir:", concat(fs.ls0(""), ", "))
---~ 	local ffl = fs.findfiles("/etc/udev")
---~ 	local ffl = fs.findall("/etc/udev")
---~ 	he.pp(ffl)
+--~ 	print("dirs: ", dls, "\nfiles: ", fls)
+	assert(fls:find"tcp_mem", "tcp_mem not found in file list")
+	assert(dls:find"conf", "conf not found in dir list")
+	-- test lstat, attr, mtype, mexec
 	local pn, fa
-	pn = "l5.c"; fa = fs.stat(pn)
---~ 	print(pn, fs.ftype(fa), fs.fperms(fa), fs.fsize(fa), 
---~ 		"is executable: ", fs.fexec(fa))
-	assert(fs.ftype(fa[3])=="r" and not fs.fexec(fa[3]))
-	pn = "/bin/bash"; fa = fs.stat(pn)
---~ 	print(pn, fs.ftype(fa), fs.fperms(fa), fs.fsize(fa),
---~ 		"is executable: ", fs.fexec(fa))
-	assert(fs.ftype(fa[3])=="r" and fs.fexec(fa[3]))
-	pn = "l5/"; fa = fs.stat(pn)
---~ 	print(pn, fs.ftype(fa), fs.fperms(fa), fs.fsize(fa),
---~ 		"is executable: ", fs.fexec(fa))
-	assert(fs.ftype(fa[3])=="d" and not fs.fexec(fa[3]))
-	
+	pn = "l5.c"; fa = fs.lstat(pn)
+--~ 	he.pp(fa)
+	local m = fs.attr(fa, 'mode')
+	assert(fs.typestr(fs.mtype(m)) == 'r')
+	assert(not fs.mexec(m))
 	print("test_fs: ok.")
 end
 
@@ -229,7 +221,7 @@ function test_file()
 	local O_RDWR = 0x00000002
 	fd = assert(l5.open(fname, O_RDWR, 0))
 	assert(l5.ftruncate(fd, 20))
-	assert(fs.fsize(fname) == 20)
+	assert(fs.size(fname) == 20)
 	f= assert(l5.fdopen(fd, 'a')) -- f is a lua file object
 	f:write("world!"); f:flush(); f:close()
 	assert(util.fget(fname) == rpad("hello", 20, '\0') .. "world!")
