@@ -93,56 +93,6 @@ function test_stat()
 end
 
 ------------------------------------------------------------------------
--- test ioctl() - set tty in raw mode and back to original mode
-
-
-function test_tty_mode()
-	-- get current mode
-	local cookedmode, eno = tty.getmode()
-	assert(cookedmode, errm(eno, "tty.getmode"))
-	assert(cookedmode:sub(1,36) == tty.initialmode:sub(1,36))
-		--why the difference, starting at c_cc[19] (tos+36) ???
-
-	print("test raw mode (blocking):  hit key, 'q' to quit.")
-	-- set raw mode
-	nonblocking = nil
-	local rawmode = tty.makerawmode(cookedmode, nonblocking)
-	tty.setmode(rawmode)
---~ 	tty.setmode(cookedmode)
---~ 	tty.setrawmode()
-	while true do 
-		c = io.read(1)
-		if c == 'q' then break end
-		print(string.byte(c))
-	end
-	-- reset cooked mode
---~ 	tty.setmode(cookedmode)
-	tty.restoremode()
-	print("\rback to normal cooked mode.")
-	
-	print("test raw mode (nonblocking):  hit key, 'q' to quit.")
-	-- set raw mode
-	nonblocking = true
-	local rawmode = tty.makerawmode(cookedmode, nonblocking)
-	tty.setmode(rawmode)
-	while true do 
-		c = io.read(1)
-		if not c then
-			io.write(".")
-			l5.msleep(500)
-		elseif c == 'q' then break
-		else	print(string.byte(c))
-		end
-	end
-	-- reset cooked mode
---~ 	tty.setmode(cookedmode)
-	tty.restoremode()
-	print("\rback to normal cooked mode.")
-
-	print("test_mode: ok.")
-end
-
-------------------------------------------------------------------------
 -- test fork and other proc funcs
 
 function test_fork()
@@ -236,7 +186,6 @@ end
 
 test_procinfo()
 test_stat()
---~ test_tty_mode()
 test_fork()
 test_fs()
 test_file()
