@@ -85,6 +85,9 @@ sock.EAGAIN = EAGAIN
 sock.EOF     = 0x10000	-- outside of the range of errno numbers
 sock.TIMEOUT = 0x10001	
 
+sock.AF_UNIX = 1
+sock.AF_INET = 2
+sock.AF_INET6 = 10
 
 function sock.sbind(sa, nonblocking, backlog)
 	-- create a stream socket object, bind it to sockaddr sa,
@@ -155,6 +158,10 @@ function sock.dsocket(family, nonblocking)
 	local fd, eno = l5.socket(family, sotype, 0)
 	if not fd then return nil, eno, "socket" end
 	so.fd = fd
+	local SOL_SOCKET = 1
+	local SO_REUSEADDR = 2
+	r, eno = l5.setsockopt(so.fd, SOL_SOCKET, SO_REUSEADDR, 1)
+	if not r then return nil, eno, "setsockopt" end
 	return so
 end
 
