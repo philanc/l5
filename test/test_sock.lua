@@ -32,6 +32,46 @@ local function sa2s(sa)
 end
 ------------------------------------------------------------------------
 
+function test_stream_read() 
+	local a, ab, d, eno, em, r, n, tot, i, line, msg
+	local soname, port = "127.0.0.1", 10000
+	local line, msg, mlen, l2, m2, ss, chs, cs, pid
+	msg = "hello"
+	
+	-- setup server
+	local sa = sock.sockaddr(soname, port)
+	local ss = sock.sbind(sa)
+	assert(ss)
+	assert(sock.timeout(ss, 10000) == ss)
+	pid = l5.fork()
+	if pid == 0 then
+		-- child / client here
+		l5.msleep(100) -- give time to the server to accept
+		chs = assert(sock.sconnect(sa))
+		assert(sock.write(chs, msg))
+		sock.close(chs)
+--~ 		print("test_stream: child exiting")
+		os.exit(0)
+	else
+		-- parent / server here
+		cs, em = sock.accept(ss)
+		assert(cs, em)
+		m2, em = sock.read(cs)
+		-- attempt to read whatever is available.
+--~ 		print("read:",m2, em)
+		assert(m2 == "hello")
+		l5.msleep(200) -- wait to ensure client has closed
+		-- read again: read doesn't block. return empty string (EOF)
+		m2, em = sock.read(cs)
+		assert(m2 == "" and not em)
+		l5.waitpid(pid)
+		sock.close(cs)
+		sock.close(ss)
+		print("test_stream_read ok.")
+	end
+end --test_stream_read()
+
+
 function test_stream() 
 	local a, ab, d, eno, em, r, n, tot, i, line, msg
 	local soname, port = "127.0.0.1", 10000
@@ -45,7 +85,7 @@ function test_stream()
 	local sa = sock.sockaddr(soname, port)
 	local ss = sock.sbind(sa)
 	assert(ss)
-	assert(sock.timeout(ss, 10000) == ss)
+	assert(sock.timeout(ss, 10000) == ss) -- 10 sec timeout
 	pid = l5.fork()
 	if pid == 0 then
 		-- child / client here
@@ -66,9 +106,9 @@ function test_stream()
 		assert(a == "127.0.0.1" and p == 10000)
 		a, p = sa2s(sock.getpeername(ss))
 		assert(a == "127.0.0.1" and p == 10000)
-		l2, em = sock.read(cs)
+		l2, em = sock.readline(cs)
 		assert(l2, em)
-		m2, em = sock.read(cs, mlen)
+		m2, em = sock.readbytes(cs, mlen)
 		assert(m2, em)
 --~ 		print(l2, #m2)
 		assert(l2 == he.strip(line))
@@ -143,6 +183,7 @@ function test_datagram0()
 	-- test recv return on a non-blocking socket
 	local ss = sock.dsocket(sock.AF_UNIX, NONBLOCKING)
 	assert(sock.bind(ss, ssa))
+--~ 	print("getnameinfo:", l5.getnameinfo(ssa))
 	r, eno = sock.recv(ss)
 	assert((not r) and (eno == sock.EAGAIN))
 	sock.close(ss)
@@ -182,10 +223,13 @@ end
 ------------------------------------------------------------------------
 ------------------------------------------------------------------------
 
+test_stream_read()
+
+
 test_stream()
+test_datagram0()
 
 --~ test_datagram()
-test_datagram0()
 
 print("test_sock ok.")
 

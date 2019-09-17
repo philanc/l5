@@ -271,11 +271,11 @@ function sock.readbytes(so, n)
 	end--while reading n bytes
 end
 
-function sock.read(so, n)
-	-- buffered read: if n is provided then read n bytes
-	-- else read a line
-	if n then return sock.readbytes(so, n) end
-	return sock.readline(so)
+function sock.read(so)
+	-- attempt to read sock.BUFSIZE bytes from the socket
+	-- (ignore the socket object buffer - raw access to 
+	-- the read() syscall)
+	return l5.read(so.fd)
 end
 
 function sock.write(so, str, idx, cnt)
