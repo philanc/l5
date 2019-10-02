@@ -64,6 +64,12 @@ function sock.sockaddr_family(sa)
 	return sunpack("<H", sa)
 end
 
+function sock.sockaddr_ip_port(sa)
+	local family, port, ip1, ip2, ip3, ip4 = sunpack("<H>HBBBB", sa)
+	local ip = strf("%d.%d.%d.%d", ip1, ip2, ip3, ip4)
+	return ip,  port
+end
+
 ------------------------------------------------------------------------
 -- so functions and constants
 
@@ -88,6 +94,9 @@ sock.TIMEOUT = 0x10001
 sock.AF_UNIX = 1
 sock.AF_INET = 2
 sock.AF_INET6 = 10
+
+sock.SOCK_DGRAM = SOCK_DGRAM
+sock.SOCK_STREAM = SOCK_STREAM
 
 function sock.sbind(sa, nonblocking, backlog)
 	-- create a stream socket object, bind it to sockaddr sa,
@@ -331,6 +340,7 @@ function sock.write(so, str)
 end
 ]]
 
+--~ require'he'.pp(sock)
 ------------------------------------------------------------------------
 return sock
 
