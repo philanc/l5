@@ -340,7 +340,6 @@ function sock.write(so, str)
 end
 ]]
 
---~ require'he'.pp(sock)
 ------------------------------------------------------------------------
 return sock
 
