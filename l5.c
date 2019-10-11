@@ -259,7 +259,7 @@ static int ll_write(lua_State *L) {
 	// so write(fd, str) attempts to write all bytes in str.
 	// return number of bytes actually written, or nil, errno
 	int fd = luaL_checkinteger(L, 1);
-	int64_t len, idx, count;
+	size_t len, idx, count;
 	const char *str = luaL_checklstring(L, 2, &len);	
 	idx = luaL_optinteger(L, 3, 1);
 	count = len + idx - 1;
@@ -718,7 +718,7 @@ static int ll_sendto(lua_State *L) {
 	// of remaining bytes in string.
 	// flags is an OR of all the MSG_* flags defined in sys/socket.h
 	// return number of bytes actually sent, or nil, errno
-	int64_t len, idx, count, salen;
+	size_t len, idx, count, salen;
 	int n;
 	struct sockaddr *sa;
 	int fd = luaL_checkinteger(L, 1);
@@ -741,7 +741,7 @@ static int ll_send(lua_State *L) {
 	// of remaining bytes in string.
 	// flags is an OR of all the MSG_* flags defined in sys/socket.h
 	// return number of bytes actually sent, or nil, errno
-	int64_t len, idx, count;
+	size_t len, idx, count;
 	int n;
 	int fd = luaL_checkinteger(L, 1);
 	const char *str = luaL_checklstring(L, 2, &len);	
