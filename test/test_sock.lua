@@ -56,13 +56,13 @@ function test_stream_read()
 		-- parent / server here
 		cs, em = sock.accept(ss)
 		assert(cs, em)
-		m2, em = sock.read(cs)
+		m2, em = sock.readbuf(cs)
 		-- attempt to read whatever is available.
 --~ 		print("read:",m2, em)
 		assert(m2 == "hello")
 		l5.msleep(200) -- wait to ensure client has closed
 		-- read again: read doesn't block. return empty string (EOF)
-		m2, em = sock.read(cs)
+		m2, em = sock.readbuf(cs)
 		assert(m2 == "" and not em)
 		l5.waitpid(pid)
 		sock.close(cs)
