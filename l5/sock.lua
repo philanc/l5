@@ -280,7 +280,9 @@ function sock.readbytes(so, n)
 	end--while reading n bytes
 end
 
-function sock.read(so)
+sock.read = sock.readbytes  -- define a common alias
+
+function sock.readbuf(so)
 	-- attempt to read sock.BUFSIZE bytes from the socket
 	-- (ignore the socket object buffer - raw access to 
 	-- the read() syscall)
