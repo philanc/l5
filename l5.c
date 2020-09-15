@@ -313,7 +313,7 @@ static int ll_pipe2(lua_State *L) {
 	int flags  = luaL_optinteger(L, 1, 0);
 	int pipefd[2];
 	int r = pipe2(pipefd, flags);
-	if r < 0 then return nil_errno(L);
+	if (r < 0) return nil_errno(L);
 	lua_pushinteger(L, pipefd[0]);
 	lua_pushinteger(L, pipefd[1]);
 	return 2;
