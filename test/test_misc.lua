@@ -192,7 +192,9 @@ test_file()
 
 
 -- test execve
---~ l5.execve("/usr/bin/env", {"/usr/bin/env"}, {"AAA=AAAVALUE"})
+l5.execve("/usr/bin/env", {"/usr/bin/env"}, {"test_execve= ok."})
+--~ l5.execve("/usr/bin/env", {"/usr/bin/env"}, l5.environ()))
+--~ print(l5.execve("/ut/bin/slua", {"/ut/bin/slua"}, {"AAA=AAAVALUE", "ZZZ=ZZZVALUE"}))
 --~ l5.execve("/bin/cat", {"/bin/cat", "--help"}, {"AAA=AAAVALUE"})
 
 

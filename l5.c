@@ -308,6 +308,17 @@ static int ll_fdopen(lua_State *L) {
 	return 1;
 }
 
+static int ll_pipe2(lua_State *L) {
+	// lua api: pipe2([flags]) => fd_read, fd_write or nil, errno
+	int flags  = luaL_optinteger(L, 1, 0);
+	int pipefd[2];
+	int r = pipe2(pipefd, flags);
+	if r < 0 then return nil_errno(L);
+	lua_pushinteger(L, pipefd[0]);
+	lua_pushinteger(L, pipefd[1]);
+	return 2;
+}
+
 static int ll_ftruncate(lua_State *L) {
 	// lua api: ftruncate(fd, len)
 	int fd = luaL_checkinteger(L, 1);
