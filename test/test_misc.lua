@@ -183,12 +183,34 @@ end
 
 
 ------------------------------------------------------------------------
+function test_pipe2()
+	local fd0, fd1 = l5.pipe2()
+	assert(fd0, fd1)
+--~ 	print("PIPE2", fd0, fd1)
+	local pid = l5.fork()
+	if pid == 0 then -- child
+		l5.close(fd1)
+		local s, err = l5.read(fd0)
+		assert(s == "Hello!")
+		l5.close(fd0)
+		os.exit()
+	else -- parent
+		l5.close(fd0)
+		l5.write(fd1, "Hello!")
+	end
+	print("test_pipe2: ok.")
+end
+
+
+------------------------------------------------------------------------
 
 test_procinfo()
 test_stat()
 test_fork()
+test_pipe2()
 test_fs()
 test_file()
+
 
 
 -- test execve
