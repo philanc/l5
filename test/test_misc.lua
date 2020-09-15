@@ -197,6 +197,7 @@ function test_pipe2()
 	else -- parent
 		l5.close(fd0)
 		l5.write(fd1, "Hello!")
+		l5.close(fd1)
 	end
 	print("test_pipe2: ok.")
 end
