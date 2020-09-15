@@ -882,6 +882,7 @@ static const struct luaL_Reg l5lib[] = {
 	{"read", ll_read},
 	{"write", ll_write},
 	{"dup2", ll_dup2},
+	{"pipe2", ll_pipe2},
 	{"fileno", ll_fileno},
 	{"fdopen", ll_fdopen},
 	{"ftruncate", ll_ftruncate},
