@@ -52,6 +52,7 @@ dup2(oldfd [, newfd]) => newfd
 fileno(file) => fd
 fdopen(fd) => file
 ftruncate(fd, size)
+pipe2([flags]) => fd0, fd1
 
 opendir(pathname) => dfd
 readdir(dfd) => pathname, filetype
