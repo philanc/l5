@@ -47,6 +47,7 @@ open() => fd
 read(fd, cnt) => str  --(read up to 4 kbytes)
 write(fd, str [, idx, count]) => n
 close(fd)
+fcntl(fd, cmd, arg) => int
 fsync(fd)
 dup2(oldfd [, newfd]) => newfd
 fileno(file) => fd
