@@ -94,6 +94,7 @@ local function spawn_child(exepath, argl, envl, ef)
 end --spawn_child
 
 local function piperead_new(fd)
+	-- create a new read task
 	local prt = { -- a "piperead" task
 		done = false,
 		fd = fd,
@@ -144,7 +145,8 @@ local function piperead(prt, rev)
 end --piperead
 
 local function pipewrite_new(fd, str)
-	local pwt = { -- a "pipewrite" task
+	-- create a new write task
+	local pwt = {
 		done = false,
 		fd = fd, 
 		s = str,
@@ -200,9 +202,10 @@ end --pipewrite
 -- popen2
 
 
-local function popen2raw(exepath, input_str, argl, envl)
+local function popen2(cmd, input_str, envl)
 	envl = envl or l5.environ()
-	argl = argl or {}
+	local argl = {"bash", "-c", cmd}
+	local exepath = "/bin/bash"
 	local r, eno, em, err, pid
 	-- create pipes:  cin is child stdin, cout is child stdout
 	-- pipes are non-blocking
@@ -210,6 +213,7 @@ local function popen2raw(exepath, input_str, argl, envl)
 	if not pid then return nil, cin end --here cin is the errmsg
 	
 --~ print("CHILD PID", pid)
+
 	-- here parent writes to child stdin on cin and reads from
 	-- child stdout, [stderr] on cout, cerr
 	
@@ -269,13 +273,7 @@ local function popen2raw(exepath, input_str, argl, envl)
 	
 	return r, em, exitcode
 	
-end--popen2raw
-
-local function popen2(cmd, in_str, envl)
-	envl = envl or l5.environ()
-	local argl = {"bash", "-c", cmd}
-	return popen2raw("/bin/bash", in_str, argl, envl)
-end
+end--popen2
 
 ------------------------------------------------------------------------
 local popen = {
