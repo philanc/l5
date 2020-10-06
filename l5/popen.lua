@@ -163,13 +163,13 @@ local function pipewrite(pwt, rev)
 	-- rev: a poll revents for the pwt file descriptor
 	-- return the updated task or nil, errmsg in case of 
 	-- unrecoverable error
-	local em, cnt
+	local em, eno, status, exitcode, cnt, wpid
 	if pwt.done or rev == 0 then 
 		-- nothing to do
 	elseif rev & (POLLNVAL | POLLUP | POLLERR) ~= 0 then
-		-- cannot write. should abort
-		em = strf("cannot write to pipe. revents=0x%x", rev)
-		return nil, em		
+		-- cannot write. assume child is no longer there 
+		-- or has closed the pipe. => write is done.
+		goto done
 	elseif rev & POLLOUT ~= 0 then -- can write
 		cnt =  #pwt.s - pwt.si + 1
 		if cnt > pwt.bs then cnt = pwt.bs end
@@ -199,7 +199,9 @@ local function pipewrite(pwt, rev)
 	return pwt
 end --pipewrite
 ------------------------------------------------------------------------
--- popen2
+-- popen2 
+--   - run a shell cmd in a subprocess
+--   - send stdin, capture stdout
 
 
 local function popen2(cmd, input_str, envl)
@@ -276,34 +278,110 @@ local function popen2(cmd, input_str, envl)
 end--popen2
 
 ------------------------------------------------------------------------
+-- popen3
+--   - run a shell cmd in a subprocess
+--   - send stdin, capture stdout and stderr
+
+
+local function popen3(cmd, input_str, envl)
+	-- run 'sh -c <cmd>' in a sub-shell. sends input_str to its 
+	-- stdin and capture its stdout and stderr
+	envl = envl or l5.environ()
+	local argl = {"bash", "-c", cmd}
+	local exepath = "/bin/bash"
+	local r, eno, em, err, pid
+	-- create pipes:  cin is child stdin, cout is child stdout,
+	-- cerr is child stderr. pipes are non-blocking.
+	local pid, cin, cout, cerr = spawn_child(exepath, argl, envl, true)
+	if not pid then return nil, cin end --here cin is the errmsg
+	
+--~ print("CHILD PID", pid)
+
+	-- here parent writes to child stdin on cin and reads from
+	-- child stdout, stderr on cout, cerr
+--~ print("PIPE FDs", cin, cout, cerr)
+	
+	local inpwt = pipewrite_new(cin, input_str)
+	local outprt = piperead_new(cout)
+	local errprt = piperead_new(cerr)
+	
+	local poll_list = {inpwt.poll, outprt.poll, errprt.poll}
+	local rev, cnt, wpid, status, exitcode
+	local rout, rerr
+	
+	while true do
+		-- poll cin, cout, cerr
+		r, eno = l5.poll(poll_list, 200) -- timeout=200ms
+--~ print("POLL r, eno, indone, outdone, errdone", 
+--~ 	r, eno, inpwt.done, outprt.done, errprt.done)
+		if not r then
+			em = errm(eno, "poll")
+			goto abort
+		elseif r == 0 then
+			goto continue
+		end
+		
+		--write to cin
+		rev = poll_list[1] & 0xffff
+		r, em = pipewrite(inpwt, rev)
+		if not r then goto abort end
+		
+		--read from cout
+		rev = poll_list[2] & 0xffff
+		r, em = piperead(outprt, rev)
+		if not r then goto abort end
+		
+		--read from cerr
+		rev = poll_list[3] & 0xffff
+		r, em = piperead(errprt, rev)
+		if not r then goto abort end
+		
+		-- are we done?
+		if inpwt.done and outprt.done and errprt.done then break end
+		
+		-- update the poll_list
+		poll_list[1] = inpwt.poll
+		poll_list[2] = outprt.poll
+		poll_list[3] = errprt.poll
+		
+		::continue::
+	end--while
+	
+	wpid, status = l5.waitpid(pid)
+	exitcode = (status & 0xff00) >> 8
+--~ pf("WAITOID\t\t%s   status: 0x%x  exit: %d", wpid, status, exitcode)
+	
+	rout = table.concat(outprt.rt)
+	rerr = table.concat(errprt.rt)
+	em = nil
+	goto closeall
+	
+	::abort::
+		rout, rerr = nil, em -- return nil, error msg
+
+	::closeall::
+		if not inpwt.closed then l5.close(cin) end
+		l5.close(cout)
+		l5.close(cerr)
+--~ print("CLOSE cin", l5.close(cin))
+--~ print("CLOSE cout", l5.close(cout))
+--~ print("CLOSE cerr", l5.close(cerr))
+	
+	return rout, rerr, exitcode
+	
+end--popen3
+
+
+
+
+------------------------------------------------------------------------
 local popen = {
 	popen2 = popen2,
+	popen3 = popen3,
 }
 
 return popen
 
---[[ NOTES
 
-read() may fail due to nonblocking stdin
-see eg. 
-https://lists.gnu.org/archive/html/bug-bash/2017-01/msg00039.html
-
-=> should set non-blocking only the parent-end of pipe cin
-=> must add fcntl to l5.c ...
-
-from url above -- set fd nonblocking:
-	#include <fcntl.h>
-	...
-	int flags = fcntl (0, F_GETFL);
-	if (fcntl(0, F_SETFL, flags | O_NONBLOCK)) { ...
-
--- set fd blocking
-	int flags = fcntl (0, F_GETFL);
-	if (fcntl(0, F_SETFL, flags & ~O_NONBLOCK))
-	  sys_error (_("Failed to make stdin blocking"));
-
-
-
-]]
 	
 	
