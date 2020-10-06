@@ -114,7 +114,15 @@ local function test_shell_opt1()
 	assert(not rout) --nil
 	assert(rerr == "readbytes limit exceeded") --nil
 	assert(not ex) --nil
-
+	
+	-- child process too slow to read/write
+	--    - don't spend more than ~500 ms in poll timeout
+	local opt = {poll_timeout = 100, poll_maxtimeout = 500}
+	rout, rerr, ex = process.shell1("sleep 5 ; pwd", opt)
+--~ 	print("test_shell_opt1", rout, rerr, ex)
+	assert(not rout) --nil
+	assert(rerr == "timeout limit exceeded") --nil
+	assert(not ex) --nil
 	--
 	
 end

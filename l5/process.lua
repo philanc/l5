@@ -17,12 +17,13 @@ run3(exe, argl, input, opt) => stdout, stderr, exitcode  or  nil, errmsg
 	  opt.envl: program environment as a list of strings
 		"key=value" (as returned by l5.environ())
 	  opt.cd: the program is run in this directory
-	  --
-	  -- not yet impl.:
 	  opt.maxsize:  if captured stdout or stderr is larger than this, 
 		the program is terminated
-	  opt.poll_timeout: poll timout in ms
 
+	-- not yet impl.:
+	  opt.poll_timeout: poll timout in ms
+	  opt.poll_maxtimeout: total poll timeout in ms
+	  
 shell1(cmd, opt) => stdout, nil, exitcode  or  nil, errmsg
 shell2(cmd, input, opt) => stdout, nil, exitcode  or  nil, errmsg
 shell3(cmd, input, opt) => stdout, stderr, exitcode  or  nil, errmsg
@@ -304,6 +305,10 @@ local function run(exepath, argl, input_str, opt, pn)
 	local poll_list = {inpwt.poll, outprt.poll, errprt.poll}
 	local rev, cnt, wpid, status, exitcode
 	local rout, rerr
+	local timeout = opt.poll_timeout or 200 -- default timeout=200ms
+	local maxtimeout = opt.poll_maxtimeout or MAXINT 
+		-- default is to wait forever
+	local totaltimeout = 0
 	
 	while true do
 		-- poll cin, cout, cerr
@@ -311,7 +316,13 @@ local function run(exepath, argl, input_str, opt, pn)
 		if not r then
 			em = errm(eno, "poll")
 			goto abort
-		elseif r == 0 then -- nothing to do
+		elseif r == 0 then -- timeout
+			totaltimeout = totaltimeout + timeout
+			if totaltimeout > maxtimeout then
+				em = "timeout limit exceeded"
+				goto abort
+			end
+			-- nothing else to do
 			goto continue
 		end
 		
