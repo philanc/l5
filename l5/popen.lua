@@ -205,6 +205,8 @@ end --pipewrite
 
 
 local function popen2(cmd, input_str, envl)
+	-- run 'sh -c <cmd>' in a sub-process. sends input_str to its 
+	-- stdin and capture its stdout.
 	envl = envl or l5.environ()
 	local argl = {"bash", "-c", cmd}
 	local exepath = "/bin/bash"
@@ -228,11 +230,10 @@ local function popen2(cmd, input_str, envl)
 	while true do
 		-- poll cin, cout
 		r, eno = l5.poll(poll_list, 200) -- timeout=200ms
---~ print("POLL r, eno, indone, outdone", r, eno, inpwt.done, outprt.done)
 		if not r then
 			em = errm(eno, "poll")
 			goto abort
-		elseif r == 0 then
+		elseif r == 0 then  -- nothing to do
 			goto continue
 		end
 		
@@ -258,7 +259,7 @@ local function popen2(cmd, input_str, envl)
 	
 	wpid, status = l5.waitpid(pid)
 	exitcode = (status & 0xff00) >> 8
---~ pf("WAITOID\t\t%s   status: 0x%x  exit: %d", wpid, status, exitcode)
+--~ pf("WAITPID\t\t%s   status: 0x%x  exit: %d", wpid, status, exitcode)
 	
 	r = table.concat(outprt.rt)
 	em = nil
@@ -270,8 +271,6 @@ local function popen2(cmd, input_str, envl)
 	::closeall::
 		if not inpwt.closed then l5.close(cin) end
 		l5.close(cout)
---~ print("CLOSE cin", l5.close(cin))
---~ print("CLOSE cout", l5.close(cout))
 	
 	return r, em, exitcode
 	
@@ -284,7 +283,7 @@ end--popen2
 
 
 local function popen3(cmd, input_str, envl)
-	-- run 'sh -c <cmd>' in a sub-shell. sends input_str to its 
+	-- run 'sh -c <cmd>' in a sub-process. sends input_str to its 
 	-- stdin and capture its stdout and stderr
 	envl = envl or l5.environ()
 	local argl = {"bash", "-c", cmd}
@@ -299,7 +298,6 @@ local function popen3(cmd, input_str, envl)
 
 	-- here parent writes to child stdin on cin and reads from
 	-- child stdout, stderr on cout, cerr
---~ print("PIPE FDs", cin, cout, cerr)
 	
 	local inpwt = pipewrite_new(cin, input_str)
 	local outprt = piperead_new(cout)
@@ -312,12 +310,10 @@ local function popen3(cmd, input_str, envl)
 	while true do
 		-- poll cin, cout, cerr
 		r, eno = l5.poll(poll_list, 200) -- timeout=200ms
---~ print("POLL r, eno, indone, outdone, errdone", 
---~ 	r, eno, inpwt.done, outprt.done, errprt.done)
 		if not r then
 			em = errm(eno, "poll")
 			goto abort
-		elseif r == 0 then
+		elseif r == 0 then -- nothing to do
 			goto continue
 		end
 		
@@ -349,7 +345,7 @@ local function popen3(cmd, input_str, envl)
 	
 	wpid, status = l5.waitpid(pid)
 	exitcode = (status & 0xff00) >> 8
---~ pf("WAITOID\t\t%s   status: 0x%x  exit: %d", wpid, status, exitcode)
+--~ pf("WAITPID\t\t%s   status: 0x%x  exit: %d", wpid, status, exitcode)
 	
 	rout = table.concat(outprt.rt)
 	rerr = table.concat(errprt.rt)
@@ -363,9 +359,6 @@ local function popen3(cmd, input_str, envl)
 		if not inpwt.closed then l5.close(cin) end
 		l5.close(cout)
 		l5.close(cerr)
---~ print("CLOSE cin", l5.close(cin))
---~ print("CLOSE cout", l5.close(cout))
---~ print("CLOSE cerr", l5.close(cerr))
 	
 	return rout, rerr, exitcode
 	
