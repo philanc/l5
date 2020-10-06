@@ -19,8 +19,6 @@ run3(exe, argl, input, opt) => stdout, stderr, exitcode  or  nil, errmsg
 	  opt.cd: the program is run in this directory
 	  opt.maxsize:  if captured stdout or stderr is larger than this, 
 		the program is terminated
-
-	-- not yet impl.:
 	  opt.poll_timeout: poll timout in ms
 	  opt.poll_maxtimeout: total poll timeout in ms
 	  
