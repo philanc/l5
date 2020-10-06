@@ -109,11 +109,11 @@ local function test_shell_opt1()
 	assert(ex == 0)
 end
 
---~ test_run1()
---~ test_run2()
---~ test_run3()
---~ test_shell1_2()
---~ test_shell3()
+test_run1()
+test_run2()
+test_run3()
+test_shell1_2()
+test_shell3()
 test_shell_opt1()
-print("test process ok.")
+print("test_process ok.")
 
