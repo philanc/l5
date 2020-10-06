@@ -64,6 +64,8 @@ local ENOENT = 2
 local EPIPE = 32
 local EINVAL = 22
 
+local MAXINT = math.maxinteger
+
 ------------------------------------------------------------------------
 
 local clo = function(fd) 
@@ -150,13 +152,16 @@ local function spawn_child(exepath, argl, envl, pn, cd)
 	return pid, cin1, cout0, cerr0
 end --spawn_child
 
-local function piperead_new(fd)
+local function piperead_new(fd, maxbytes)
 	fd = fd or -1
+	maxbytes = maxbytes or MAXINT
 	-- create a new read task
 	local prt = { -- a "piperead" task
 		done = (fd == -1), -- nothing to do if fd=-1
 		fd = fd,
 		rt = {}, -- table to collect read fragments
+		maxbytes = maxbytes, -- max number of byte to read
+		readbytes = 0,  -- total number of bytes already read
 		poll = (fd << 32) | (POLLIN << 16), -- poll_list entry
 	}
 	return prt
@@ -181,6 +186,10 @@ local function piperead(prt, rev)
 			prt.done=true
 		else
 			table.insert(prt.rt, r)
+			prt.readbytes = prt.readbytes + #r
+			if prt.readbytes > prt.maxbytes then
+				return nil, "readbytes limit exceeded" --abort
+			end
 		end
 	elseif rev & (POLLNVAL | POLLUP) ~= 0 then 
 		-- pipe closed by other party
@@ -289,8 +298,8 @@ local function run(exepath, argl, input_str, opt, pn)
 	
 	
 	local inpwt = pipewrite_new(cin, input_str)
-	local outprt = piperead_new(cout)
-	local errprt = piperead_new(cerr)
+	local outprt = piperead_new(cout, opt.maxbytes)
+	local errprt = piperead_new(cerr, opt.maxbytes)
 	
 	local poll_list = {inpwt.poll, outprt.poll, errprt.poll}
 	local rev, cnt, wpid, status, exitcode

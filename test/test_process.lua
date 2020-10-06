@@ -107,6 +107,16 @@ local function test_shell_opt1()
 	assert(rout == "/bin\n")
 	assert(rerr == "")
 	assert(ex == 0)
+	
+	-- read more than maxbytes
+	rout, rerr, ex = process.shell1("ls -l /dev", {maxbytes=4096})
+--~ 	print("test_shell_opt1", rout, rerr, ex)
+	assert(not rout) --nil
+	assert(rerr == "readbytes limit exceeded") --nil
+	assert(not ex) --nil
+
+	--
+	
 end
 
 test_run1()
