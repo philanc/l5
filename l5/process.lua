@@ -277,7 +277,9 @@ local function run(exepath, argl, input_str, opt, pn)
 	local r, eno, em, err, pid
 	-- create pipes:  cin is child stdin, cout is child stdout,
 	-- cerr is child stderr. pipes are non-blocking.
-	local pid, cin, cout, cerr = spawn_child(exepath, argl, envl, pn)
+	local pid, cin, cout, cerr = spawn_child(
+		exepath, argl, envl, pn, opt.cd
+		)
 	if not pid then return nil, cin end --here cin is the errmsg
 	
 --~ print("CHILD PID", pid)

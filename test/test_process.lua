@@ -96,16 +96,24 @@ end
 
 local function test_shell3()
 	-- test get output + err
-	local rout, rerr,ex = assert(process.shell3("who ; who -z", ""))
-	print("test_shell3", rout, rerr, ex)
+	local rout, rerr, ex = assert(process.shell3("who ; who -z", ""))
+--~ 	print("test_shell3", rout, rerr, ex)
+	assert(rout and rerr and #rout > 5 and #rerr >5)
 end
 
+local function test_shell_opt1()
+	local rout, rerr, ex = process.shell1("pwd", {cd="/bin"})
+--~ 	print("test_shell_opt1", rout, rerr, ex)
+	assert(rout == "/bin\n")
+	assert(rerr == "")
+	assert(ex == 0)
+end
 
-
-test_run1()
-test_run2()
-test_run3()
-test_shell1_2()
+--~ test_run1()
+--~ test_run2()
+--~ test_run3()
+--~ test_shell1_2()
 --~ test_shell3()
+test_shell_opt1()
 print("test process ok.")
 
