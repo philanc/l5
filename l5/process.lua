@@ -26,14 +26,14 @@ shell1(cmd, opt) => stdout, nil, exitcode  or  nil, errmsg
 shell2(cmd, input, opt) => stdout, nil, exitcode  or  nil, errmsg
 shell3(cmd, input, opt) => stdout, stderr, exitcode  or  nil, errmsg
 
-shell<i> are similar to run<i> functions except taht the executable path and 
+shell<i> are similar to run<i> functions except that the executable path and 
 argument list are replaced with a shell command.
 
 ]]
 
 
 
-he = require "he" -- at https://github.com/philanc/he
+--  he = require "he" -- at https://github.com/philanc/he
 
 l5 = require "l5"
 
@@ -152,9 +152,9 @@ local function spawn_child(exepath, argl, envl, pn, cd)
 end --spawn_child
 
 local function piperead_new(fd, maxbytes)
+	-- create a new read task
 	fd = fd or -1
 	maxbytes = maxbytes or MAXINT
-	-- create a new read task
 	local prt = { -- a "piperead" task
 		done = (fd == -1), -- nothing to do if fd=-1
 		fd = fd,
@@ -211,8 +211,8 @@ local function piperead(prt, rev)
 end --piperead
 
 local function pipewrite_new(fd, str)
-	fd = fd or -1
 	-- create a new write task
+	fd = fd or -1
 	local pwt = {
 		done = (fd == -1), -- nothing to do if fd=-1
 		fd = fd, 

@@ -144,7 +144,7 @@ static int ll_environ(lua_State *L) {
 }
 
 static int ll_msleep(lua_State *L) {
-	// lua api: msleep(fd, ms)
+	// lua api: msleep(ms)
 	// suspend the execution for ms milliseconds
 	// return true, or nil, errno
 	int ms = luaL_checkinteger(L, 1);

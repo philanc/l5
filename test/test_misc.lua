@@ -99,15 +99,15 @@ function test_fork()
 	parpid = l5.getpid()
 	pid = l5.fork()
 	if pid == 0 then
---~ 		print("  child: getpid(), getppid =>", 
---~ 			l5.getpid(), l5.getppid())
+		print("  child: getpid(), getppid =>", 
+			l5.getpid(), l5.getppid())
 		assert(parpid == l5.getppid())
---~ 		print("  child: exiting with os.exit(3)...")
+		print("  child: exiting with os.exit(3)...")
 		os.exit(3)
 	else
---~ 		print("  parent pid =>", parpid)
---~ 		print("  parent: fork =>", pid)
---~ 		print("  parent: waiting for child...")
+		print("  parent pid =>", parpid)
+		print("  parent: fork =>", pid)
+		print("  parent: waiting for child...")
 --~ 		l5.kill(pid, 15)
 		pid, status = l5.waitpid()
 --~ 		print("  parent: wait =>", pid, status)

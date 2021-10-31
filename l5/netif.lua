@@ -123,6 +123,10 @@ local function test1()
 	for i, v in ipairs(ifl) do print('  -', i, v) end
 end
 
+	print("test1\n\ninterface list\n" 
+		.. map(assert(netif.iflist(nfd)), bind1(strf, "  -  %s\n")))
+	
+
 local function saip(sa) 
 	local ip, port = sock.sockaddr_ip_port(sa)
 	return ip
