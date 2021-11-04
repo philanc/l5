@@ -133,9 +133,10 @@ function test_fs()
 	local found = false
 	for i, e in ipairs(dl) do
 --~ 		print(e[2], e[1]) -- ftype, fname
-		found = found or (e[1] == "bin" and e[2] == "d")
+		-- changed '/bin' to '/dev' because /bin is now often a link
+		found = found or (e[1] == "dev" and e[2] == "d")
 	end
-	assert(found, "/bin not found")
+	assert(found, "/dev not found")
 	dl, em = fs.ls3("/dev/mapper")
 	found = false
 	for i, e in ipairs(dl) do
