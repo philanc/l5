@@ -57,7 +57,7 @@ end
 
 function loop.setup(devname, filename, ro_flag)
 	-- setup the loop device
-	-- default flags is O_RDWR(2)
+	-- default flags is O_RDWR
 	local flags = ro_flag and 0 or 2  -- 0=O_RDONLY, 2=O_RDWR
 	local LOOP_SET_FD = 0x4C00
 	local LOOP_SET_STATUS64	= 0x4C04

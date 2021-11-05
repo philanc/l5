@@ -1,10 +1,14 @@
 -- Copyright (c) 2019  Phil Leblanc  -- see LICENSE file
 ------------------------------------------------------------------------
--- L5 poll functions and constants
+--[[		 L5 poll functions and constants
+
+XXXXXXXXXXXXXX   Work In Progress !!!   XXXXXXXXXXXXXXXXX
+
+At the moment, a better example of l5.poll() usage can be found 
+in file 'process.lua' (eg. see function run() and related local functions)
 
 
--- XXXXXXXXXXXXXX   WIP !!!   XXXXXXXXXXXXXXXXX
-
+]]
 local l5 = require "l5"
 local util = require "l5.util"
 

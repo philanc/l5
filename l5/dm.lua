@@ -1,8 +1,19 @@
 -- Copyright (c) 2019  Phil Leblanc  -- see LICENSE file
 ------------------------------------------------------------------------
--- L5 device mapper functions
+--[[		L5 device mapper functions
 
+WARNING:  
 
+   These functions allow to setup arbitrary block device mappings.
+   
+   Some of them must be run as root and may wreak havoc on your system.
+   
+EXTREME CAUTION IS ADVISED
+   
+   Test in a VM or at least on ad hoc loop devices!
+
+ ]]
+ 
 local l5 = require "l5"
 local util = require "l5.util"
 
