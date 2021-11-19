@@ -1,3 +1,5 @@
+![CI](https://github.com/philanc/l5/workflows/CI/badge.svg)
+
 # L5
 
 L5, a **Low-Level Linux Library for Lua** is a minimal binding to low-level OS function for Linux. 

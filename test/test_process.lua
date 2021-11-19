@@ -103,7 +103,8 @@ local function test_shell_opt1()
 	--
 	
 end
-
+print("------------------------------------------------------------")
+print("test_process...	Please ignore 'who' and 'md5sum' error messages")
 test_run1()
 test_run2()
 test_run3()
