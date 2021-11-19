@@ -8,7 +8,7 @@ WARNING:
    
    Some of them must be run as root and may wreak havoc on your system.
    
-EXTREME CAUTION IS ADVISED
+EXTREME CAUTION IS ADVISED - USE AT YOUR OWN RISK
    
    Test in a VM or at least on ad hoc loop devices!
 

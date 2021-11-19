@@ -16,6 +16,14 @@ local errm, rpad, pf, px = util.errm, util.rpad, util.pf, util.px
 
 Notes:
 
+Naming convention: Usually, 
+	fd or *fd  is a file descriptor (an integer)
+	sa is a  sockaddr struct as a Lua string
+	so is a socket object (a Lua table)
+	eno is an errno value (an integer)
+	r is the result of a l5 function (often an integer - the return
+		value of the corresponding C function - or nil/false
+		in case of an error)
 
 
 
