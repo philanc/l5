@@ -1,9 +1,5 @@
 
 
-
-
-he = require "he" -- at https://github.com/philanc/he
-
 l5 = require "l5"
 
 util = require "l5.util"
@@ -64,16 +60,12 @@ function test_stat()
 	-- assume the current dir is "some/path/l5" and contains l5.c
 	os.execute("rm -f l5symlink; ln -s l5.c l5symlink")
 	local lmode, lsize, lmtim = l5.lstat3("l5symlink")
---~ 	he.printf("  mode: %o  size: %d  mtim: %s ", 
---~ 		lmode, lsize, he.isodate19(lmtim) )
 	assert(lsize == 4)
 	assert(lmode & 0xf000 == 0xa000) -- type is symlink
 	assert(lmode & 0xfff == 0x01ff) -- perm is '0777'
 	local target = l5.readlink("l5symlink")
 	assert(target == "l5.c")
 	local mode, size, mtim = l5.lstat3("l5.c")
---~ 	he.printf("  mode: %o  size: %d  mtim: %s ", 
---~ 		mode, size, he.isodate19(mtim) )
 	assert(mode & 0xf000 == 0x8000)
 	t = l5.lstat("l5.c", {})
 	assert(t[3]==mode and t[8]==size and t[12]==mtim)
@@ -156,7 +148,6 @@ function test_fs()
 	-- test lstat, attr, mtype, mexec
 	local pn, fa
 	pn = "l5.c"; fa = fs.lstat(pn)
---~ 	he.pp(fa)
 	local m = fs.attr(fa, 'mode')
 	assert(fs.typestr(fs.mtype(m)) == 'r')
 	assert(not fs.mexec(m))

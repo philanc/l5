@@ -1,9 +1,4 @@
 
-
-
-
-he = require "he" -- at https://github.com/philanc/he
-
 l5 = require "l5"
 
 util = require "l5.util"

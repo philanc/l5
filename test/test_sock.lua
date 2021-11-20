@@ -1,9 +1,4 @@
 
-
--- tso.lua - test sockets
-
-he = require "he" -- at https://github.com/philanc/he
-
 l5 = require "l5"
 
 util = require "l5.util"
@@ -111,7 +106,7 @@ function test_stream()
 		m2, em = sock.readbytes(cs, mlen)
 		assert(m2, em)
 --~ 		print(l2, #m2)
-		assert(l2 == he.strip(line))
+		assert(l2 == util.strip(line))
 --~ 		print('>>>' .. m2:sub(1,100))
 		assert(m2 == msg)
 		sock.close(cs)

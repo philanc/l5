@@ -26,6 +26,25 @@ function util.rpad(s, w, ch)
 	return (#s < w) and s .. ch:rep(w - #s) or s
 end
 
+function util.lstrip(s)
+	-- remove whitespace at beginning of string s
+	s = string.gsub(s, '^%s+', '')
+	return s  -- return only 1st value returned by gsub
+end
+
+function util.rstrip(s) 
+	-- remove whitespace at end of string s
+	s = string.gsub(s, '%s+$', '')
+	return s  -- return only 1st value returned by gsub
+end
+
+function util.strip(s) 
+	-- remove whitespace at both ends of string s
+	return util.lstrip(util.rstrip(s)) 
+end
+
+
+
 function util.errm(eno, txt)
 	-- errm(17, "open") => "open error: 17"
 	-- errm(17)         => "error: 17"

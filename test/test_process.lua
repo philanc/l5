@@ -8,8 +8,6 @@
 --	lua test/test_process.lua 2>/dev/null
 --
 
-local he = require "he"
-
 local process = require "l5.process"
 
 local function test_run1() -- stdout only
@@ -56,7 +54,7 @@ local function test_run3() -- stdin + stdout + stderr
 		)
 --~ 	print("test_run3", rout, rerr, exitcode)
 	assert(rout == "")
-	assert(he.startswith(rerr, "md5sum: invalid option -- 'y'"))
+	assert(rerr and rerr:match("^md5sum: invalid option"))
 	assert(exitcode == 1)
 end --test_run3
 
@@ -74,7 +72,7 @@ local function test_shell3()
 	local rout, rerr, ex = assert(process.shell3("who ; who -y", ""))
 --~ 	print("test_shell3", rout, rerr, ex)
 	assert(rout and #rout > 5)
-	assert(rerr and he.startswith(rerr, "who: invalid option -- 'y'"))
+	assert(rerr and rerr:match("^who: invalid option"))
 	assert(ex == 1)
 end
 
