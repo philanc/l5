@@ -69,9 +69,9 @@ end
 
 local function test_shell3()
 	-- test get output + err
-	local rout, rerr, ex = assert(process.shell3("who ; who -y", ""))
-	print("test_shell3", rout, rerr, ex)
-	assert(rout and #rout > 5)
+	local rout, rerr, ex = assert(process.shell3("who --help ; who -y", ""))
+--~ 	print("test_shell3", rout, rerr, ex)
+	assert(rout and #rout > 50)
 	assert(rerr and rerr:match("^who: invalid option"))
 	assert(ex == 1)
 end
