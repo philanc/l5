@@ -2,7 +2,11 @@
 
 # L5
 
-L5, a **Low-Level Linux Library for Lua** is a minimal binding to low-level OS function for Linux. 
+**2021-11-21  -- L5 is moving to a more explicit repository name: [lualinux](https://github.com/philanc/lualinux)**.   The L5 repository is kept here at the moment for compatibility reasons but will be removed next year.  All bug fix and development will now take place at  [lualinux](https://github.com/philanc/lualinux).
+
+---
+
+L5, a *Low-Level Linux Library for Lua* is a minimal binding to low-level OS function for Linux. 
 
 The library targets **Lua 5.3+** with the default 64-bit integers. 
 
